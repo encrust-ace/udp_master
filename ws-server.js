@@ -2,7 +2,7 @@ const WebSocket = require('ws');
 const dgram = require('dgram');
 
 const LED_DEVICES = [
-  // { ip: '192.168.68.60', count: 89 },
+  { ip: '192.168.68.60', count: 89 },
   { ip: '192.168.68.64', count: 90 },
   { ip: '192.168.68.50', count: 81 },
 ];
@@ -116,10 +116,27 @@ function renderPacketWavePulseFlow(count, volume, hue) {
   return Buffer.from([0x02, 0x01, ...leds]);
 }
 
+function renderPacketLinearWhite(count, volume) {
+  const lit = Math.floor(volume * count);
+  const leds = [];
+
+  for (let i = 0; i < count; i++) {
+    if (i < lit) {
+      leds.push(255, 255, 255); // White color
+    } else {
+      leds.push(0, 0, 0);
+    }
+  }
+
+  return Buffer.from([0x02, 0x01, ...leds]);
+}
+
+
 
 
 function renderPacket(count, volume, hue, effect) {
   switch (effect) {
+    case 'linear-white': return renderPacketLinearWhite(count, volume);
     case 'center-pulse': return renderPacketCenterPulse(count, volume, hue);
     case 'rainbow-flow': return renderPacketRainbowFlow(count, volume, hue);
     case 'wave-pulse': return renderPacketWavePulseFlow(count, volume, hue);

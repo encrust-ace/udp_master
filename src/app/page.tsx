@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 
 const EFFECTS = [
+  { value: 'linear-white', label: 'Linear White' },
   { value: 'linear-fill', label: 'Linear Fill' },
   { value: 'center-pulse', label: 'Center Pulse' },
   { value: 'rainbow-flow', label: 'Rainbow Flow' },
