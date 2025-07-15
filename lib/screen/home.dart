@@ -1,61 +1,59 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:udp_master/device.dart';
 import 'package:udp_master/effect_processor.dart';
-import 'package:udp_master/main.dart';
+import 'package:udp_master/led_effects.dart';
 
 class Home extends StatefulWidget {
-  const Home({super.key});
+  final VisualizerService visualizerService;
+
+  const Home({super.key, required this.visualizerService});
 
   @override
   State<Home> createState() => _HomeState();
 }
 
 class _HomeState extends State<Home> {
-  List<LedDevice> devices = [];
-  String selectedEffect = 'linear-fill';
-  final List<String> effects = ['linear-fill', 'center-pulse', 'wave-pulse'];
-  late VisualizerService _visualizerService;
+  late LedEffect _selectedGlobalEffect;
 
   @override
   void initState() {
+    _selectedGlobalEffect = availableEffects.first;
     super.initState();
-     _visualizerService = Provider.of<VisualizerService>(context, listen: false);
-    // Listen to changes in the service's isRunning state to rebuild the FAB
-    _visualizerService.addListener(_onVisualizerStateChanged);
   }
 
-    void _onVisualizerStateChanged() {
-    // This will trigger a rebuild if the FAB's appearance depends on isRunning
-    if (mounted) {
-      setState(() {
-        devices = _visualizerService.devices;
-      });
-    }
-  }
-
-  void _setGlobalEffect(String effect) {
-    selectedEffect = effect;
-    for (var d in devices) {
-      d.currentEffect = effect;
-    }
+  void _applyGlobalEffect(BuildContext context, String effectId) {
+    LedEffect? effect = getEffectById(effectId);
     setState(() {
-      updateDevices(devices);
+      _selectedGlobalEffect = effect!;
     });
+    widget.visualizerService.updateAllDeviceEffects(effectId);
   }
 
-  void _updateDeviceEffect(int index, String effect) {
-    devices[index].currentEffect = effect;
-    setState(() {
-      updateDevices(devices);
-    });
+  void _updateDeviceInService(
+    BuildContext context,
+    LedDevice device,
+    DeviceAction action,
+  ) {
+    switch (action) {
+      case DeviceAction.add:
+        widget.visualizerService.addDevice(device);
+        break;
+      case DeviceAction.update:
+        widget.visualizerService.updateDevice(device);
+        break;
+      case DeviceAction.delete:
+        widget.visualizerService.removeDevice(device.ip);
+        Navigator.of(context).pop(true); // Close the dialog after deletion
+        break;
+    }
+    Provider.of<VisualizerService>(context, listen: false).updateDevice(device);
   }
 
   @override
   Widget build(BuildContext context) {
+    final devices = context.watch<VisualizerService>().devices;
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: SingleChildScrollView(
@@ -70,13 +68,18 @@ class _HomeState extends State<Home> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.filter_vintage_outlined),
               ),
-              value: selectedEffect,
-              items: effects
-                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+              value: _selectedGlobalEffect.id,
+              items: availableEffects
+                  .map(
+                    (LedEffect effect) => DropdownMenuItem(
+                      value: effect.id,
+                      child: Text(effect.name),
+                    ),
+                  )
                   .toList(),
-              onChanged: (val) {
-                if (val != null) {
-                  _setGlobalEffect(val);
+              onChanged: (newEffectId) {
+                if (newEffectId != null) {
+                  _applyGlobalEffect(context, newEffectId);
                 }
               },
             ),
@@ -106,8 +109,13 @@ class _HomeState extends State<Home> {
                                 child: const Text('Cancel'),
                               ),
                               TextButton(
-                                onPressed: () =>
-                                    Navigator.of(context).pop(true),
+                                onPressed: () {
+                                  _updateDeviceInService(
+                                    context,
+                                    device,
+                                    DeviceAction.delete,
+                                  );
+                                },
                                 child: const Text(
                                   'Delete',
                                   style: TextStyle(color: Colors.red),
@@ -259,7 +267,7 @@ class _HomeState extends State<Home> {
                                 width: 150,
                                 height: 44,
                                 child: DropdownButtonFormField<String>(
-                                  value: device.currentEffect,
+                                  value: device.effect,
                                   decoration: InputDecoration(
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(4),
@@ -270,18 +278,20 @@ class _HomeState extends State<Home> {
                                       horizontal: 12,
                                     ),
                                   ),
-                                  items: effects
+                                  items: availableEffects
                                       .map(
-                                        (e) => DropdownMenuItem(
-                                          value: e,
-                                          child: Text(e),
+                                        (LedEffect effect) => DropdownMenuItem(
+                                          value: effect.id,
+                                          child: Text(effect.name),
                                         ),
                                       )
                                       .toList(),
                                   onChanged: (val) {
                                     if (val != null) {
-                                      setState(
-                                        () => _updateDeviceEffect(index, val),
+                                      _updateDeviceInService(
+                                        context,
+                                        device.copyWith(effect: val),
+                                        DeviceAction.update,
                                       );
                                     }
                                   },

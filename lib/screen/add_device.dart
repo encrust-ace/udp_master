@@ -56,7 +56,7 @@ class _AddDeviceState extends State<AddDevice> {
       name: name,
       ip: ip,
       ledCount: ledCount,
-      currentEffect: selectedEffect,
+      effect: selectedEffect,
       isEnabled: true,
       type: _selectedDeviceType,
       port: int.parse(_portController.text),

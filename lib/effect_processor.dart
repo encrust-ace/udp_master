@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:math';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -15,12 +16,10 @@ double calculateVolume(List<double> samples) {
   return sqrt(sum / samples.length); // use sqrt() from dart:math
 }
 
-// These would typically be defined in your main.dart or a config file
 const MethodChannel _platform = MethodChannel("mic_channel");
 const EventChannel _micStreamChannel = EventChannel('mic_stream');
 
 class VisualizerService with ChangeNotifier {
-  // Or use ValueNotifier for simpler cases
   static final VisualizerService _instance = VisualizerService._internal();
 
   factory VisualizerService() {
@@ -30,11 +29,60 @@ class VisualizerService with ChangeNotifier {
   VisualizerService._internal();
 
   bool _isRunning = false;
-  StreamSubscription? _micSubscription;
-  List<LedDevice> _devices = []; // Keep a copy of devices to send data to
-
   bool get isRunning => _isRunning;
-  List<LedDevice> get devices => _devices;
+
+  StreamSubscription? _micSubscription;
+
+
+  List<LedDevice> _devices = [];
+  UnmodifiableListView<LedDevice> get devices => UnmodifiableListView(_devices);
+
+
+  // --- Device Management ---
+  Future<void> loadAndSetInitialDevices() async {
+    _devices = await loadDevices(); // Your existing function to load from SharedPreferences/DB
+    if (kDebugMode) {
+      print("VisualizerService: Loaded ${_devices.length} devices.");
+    }
+    notifyListeners(); // Notify that devices are loaded/changed
+  }
+
+  Future<void> addDevice(LedDevice newDevice) async {
+    _devices.add(newDevice);
+    await updateDevices(_devices); // Your existing function to save all devices
+    if (kDebugMode) {
+      print("VisualizerService: Added device '${newDevice.name}'.");
+    }
+    notifyListeners();
+  }
+
+  Future<void> updateDevice(LedDevice updatedDevice) async {
+    int index = _devices.indexWhere((d) => d.ip == updatedDevice.ip); // Assuming LedDevice has a unique 'id'
+    if (index != -1) {
+      _devices[index] = updatedDevice;
+      await updateDevices(_devices);
+      if (kDebugMode) {
+        print("VisualizerService: Updated device '${updatedDevice.name}'.");
+      }
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeDevice(String ip) async { // Remove by ID
+    _devices.removeWhere((d) => d.ip == ip);
+    await updateDevices(_devices);
+    if (kDebugMode) {
+      print("VisualizerService: Removed device with ID '$ip'.");
+    }
+    notifyListeners();
+  }
+
+  Future<void> updateAllDeviceEffects(String effect) async {
+    _devices = _devices.map((d) => d.copyWith(effect: effect)).toList();
+    await updateDevices(_devices);
+    notifyListeners();
+  }
+  // --- End Device Management ---
 
   Future<bool> _ensureMicPermission() async {
     var status = await Permission.microphone.status;
@@ -62,10 +110,6 @@ class VisualizerService with ChangeNotifier {
         print("VisualizerService: Error stopping mic via platform channel: $e");
       }
     }
-  }
-
-  void setTargetDevices(List<LedDevice> devices) {
-    _devices = devices;
   }
 
   Future<bool> startVisualizer() async {
@@ -138,10 +182,8 @@ class VisualizerService with ChangeNotifier {
     await _micSubscription?.cancel();
     _micSubscription = null;
     await _stopMicPlatform();
-
     _isRunning = false;
-    notifyListeners(); // Notify UI
-    print("VisualizerService: Visualizer stopped.");
+    notifyListeners();
   }
 
   Future<void> toggleVisualizer() async {
@@ -149,7 +191,6 @@ class VisualizerService with ChangeNotifier {
       await stopVisualizer();
     } else {
       await startVisualizer();
-      // Handle the boolean result of startVisualizer if needed (e.g., show error)
     }
   }
 }

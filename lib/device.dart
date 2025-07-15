@@ -2,6 +2,12 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+enum DeviceAction {
+  add,
+  update,
+  delete,
+}
+
 enum DeviceType { strip, single, matrix }
 
 extension DeviceTypeExtension on DeviceType {
@@ -22,7 +28,7 @@ class LedDevice {
   final String ip;
   final int port;
   final int ledCount;
-  String currentEffect;
+  String effect;
   bool isEnabled;
   final DeviceType type;
 
@@ -31,17 +37,38 @@ class LedDevice {
     required this.ip,
     this.port = 21324,
     required this.ledCount,
-    required this.currentEffect,
+    required this.effect,
     this.isEnabled = true,
     this.type = DeviceType.strip,
   });
+
+  LedDevice copyWith({
+    String? id,
+    String? name,
+    String? ip,
+    int? port,
+    int? ledCount,
+    DeviceType? type,
+    String? effect,
+    bool? isEnabled,
+  }) {
+    return LedDevice(
+      name: name ?? this.name,
+      ip: ip ?? this.ip,
+      port: port ?? this.port,
+      ledCount: ledCount ?? this.ledCount,
+      type: type ?? this.type,
+      effect: effect ?? this.effect,
+      isEnabled: isEnabled ?? this.isEnabled,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'name': name,
     'ip': ip,
     'port': port,
     'ledCount': ledCount,
-    'currentEffect': currentEffect,
+    'effect': effect,
     'isEnabled': isEnabled,
     'type': type.name,
   };
@@ -52,7 +79,7 @@ class LedDevice {
       ip: json['ip'],
       port: json['port'] ?? 21324,
       ledCount: json['ledCount'],
-      currentEffect: json['currentEffect'] ?? 'linear-fill',
+      effect: json['effect'] ?? 'linear-fill',
       isEnabled: json['isEnabled'] ?? true,
       type: DeviceType.values.firstWhere(
         (e) => e.name == (json['type'] ?? 'strip'),
