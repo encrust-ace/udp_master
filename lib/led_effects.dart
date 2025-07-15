@@ -1,12 +1,16 @@
-import 'dart:math';
+const double effectSnsitivityMultiplier = 3.0;
 
 typedef EffectRenderFunction =
     List<int> Function({
+      String? deviceIpKey,
       required int ledCount,
       required double volume,
-      required double
-      hue, // You can add more parameters if other effects need them
-      // e.g., double speed, Color customColor, etc.
+      required double hue,
+      double? peakHueOffset,
+      int? peakDecayMillis,
+      double? speedMultiplier,
+      double? scrollSpeedMin,
+      double? scrollSpeedMax,
     });
 
 class LedEffect {
@@ -21,8 +25,11 @@ class LedEffect {
   });
 }
 
+// --- HSV to RGB ---
 List<int> hsvToRgb(double h, double s, double v) {
-  /* ... (same hsvToRgb function) ... */
+  h = h.clamp(0.0, 1.0);
+  s = s.clamp(0.0, 1.0);
+  v = v.clamp(0.0, 1.0);
   int i = (h * 6).floor();
   double f = h * 6 - i;
   double p = v * (1 - s);
@@ -63,49 +70,30 @@ List<int> hsvToRgb(double h, double s, double v) {
     default:
       r = g = b = 0;
   }
-  return [(r * 255).toInt(), (g * 255).toInt(), (b * 255).toInt()];
+  return [(r * 255).round(), (g * 255).round(), (b * 255).round()];
 }
 
-List<int> renderLinearFillPacket({
-  required int ledCount,
-  required double volume,
-  required double hue,
-}) {
-  List<int> packet = [0x02, 0x01]; // Header
-
-  int lit = (volume * ledCount).clamp(0, ledCount).toInt();
-
-  for (int i = 0; i < ledCount; i++) {
-    if (i < lit) {
-      var rgb = hsvToRgb((hue + i / ledCount) % 1.0, 1.0, 1.0);
-      packet.addAll(rgb);
-    } else {
-      packet.addAll([0, 0, 0]);
-    }
-  }
-  return packet;
-}
-
-// --- Placeholder for your other effect functions ---
 List<int> renderCenterPulsePacket({
+  String? deviceIpKey,
   required int ledCount,
   required double volume,
   required double hue,
+  double? peakHueOffset,
+  int? peakDecayMillis,
+  double? speedMultiplier,
+  double? scrollSpeedMin,
+  double? scrollSpeedMax,
 }) {
-  // This is just a placeholder example, similar to linear fill for now
-  List<int> packet = [
-    0x02,
-    0x02,
-  ]; // Different header maybe? Or handle in UDP sender
-  int center = ledCount ~/ 2;
-  int spread = (volume * (ledCount / 2.0)).clamp(0, ledCount / 2.0).toInt();
+  List<int> packet = [0x02, 0x02];
+  double reactiveVolume = (volume * effectSnsitivityMultiplier).clamp(0.0, 1.0);
+  double half = ledCount / 2;
+  double spread = reactiveVolume * half;
 
   for (int i = 0; i < ledCount; i++) {
-    double distanceFromCenter = (i - center).abs().toDouble();
-    if (distanceFromCenter <= spread) {
-      // Intensity can fall off with distance from center within the spread
-      double intensity = 1.0 - (distanceFromCenter / spread);
-      var rgb = hsvToRgb(hue, 1.0, intensity.clamp(0.0, 1.0));
+    double dist = (i - half + 0.5).abs(); // for even counts
+    if (dist < spread) {
+      double intensity = (1.0 - (dist / spread)).clamp(0.0, 1.0);
+      var rgb = hsvToRgb(hue, 1.0, intensity);
       packet.addAll(rgb);
     } else {
       packet.addAll([0, 0, 0]);
@@ -114,101 +102,52 @@ List<int> renderCenterPulsePacket({
   return packet;
 }
 
-List<int> renderWavePulsePacket({
+List<int> renderVolumeBars({
+  String? deviceIpKey,
   required int ledCount,
   required double volume,
   required double hue,
+  double? peakHueOffset,
+  int? peakDecayMillis,
+  double? speedMultiplier,
+  double? scrollSpeedMin,
+  double? scrollSpeedMax,
 }) {
-  List<int> packet = [0x02, 0x03]; // Different header
-
-  // Your existing hsvToRgb function if it's not already top-level or imported
-  List<int> hsvToRgb(double h, double s, double v) {
-    int i = (h * 6).floor();
-    double f = h * 6 - i;
-    double p = v * (1 - s);
-    double q = v * (1 - f * s);
-    double t = v * (1 - (1 - f) * s);
-    double r, g, b;
-    switch (i % 6) {
-      case 0:
-        r = v;
-        g = t;
-        b = p;
-        break;
-      case 1:
-        r = q;
-        g = v;
-        b = p;
-        break;
-      case 2:
-        r = p;
-        g = v;
-        b = t;
-        break;
-      case 3:
-        r = p;
-        g = q;
-        b = v;
-        break;
-      case 4:
-        r = t;
-        g = p;
-        b = v;
-        break;
-      case 5:
-        r = v;
-        g = p;
-        b = q;
-        break;
-      default:
-        r = g = b = 0;
-    }
-    return [(r * 255).toInt(), (g * 255).toInt(), (b * 255).toInt()];
-  }
+  List<int> packet = [0x02, 0x04];
+  int active = (volume * effectSnsitivityMultiplier * ledCount).round().clamp(
+    0,
+    ledCount,
+  );
 
   for (int i = 0; i < ledCount; i++) {
-    double timeWave = sin(
-      DateTime.now().millisecondsSinceEpoch / 500.0 +
-          (i / (ledCount / (2 * pi))),
-    );
-    double intensity =
-        (0.5 + 0.5 * timeWave) * volume; // Scale the 0-1 wave by volume
-
-    intensity = intensity.clamp(0.0, 1.0);
-
-    var rgb = hsvToRgb(
-      (hue + (i / (ledCount * 0.3))) % 1.0,
-      1.0,
-      intensity,
-    );
-    packet.addAll(rgb);
+    if (i < active) {
+      var rgb = hsvToRgb(hue, 1.0, 1.0);
+      packet.addAll(rgb);
+    } else {
+      packet.addAll([0, 0, 0]);
+    }
   }
   return packet;
 }
 
+// --- Effect List ---
 final List<LedEffect> availableEffects = [
   LedEffect(
-    id: 'linear-fill',
-    name: 'Linear Fill',
-    renderFunction: renderLinearFillPacket,
+    id: 'volume-bars',
+    name: 'Volume Bars',
+    renderFunction: renderVolumeBars,
   ),
   LedEffect(
     id: 'center-pulse',
     name: 'Center Pulse',
     renderFunction: renderCenterPulsePacket,
   ),
-  LedEffect(
-    id: 'wave-pulse',
-    name: 'Wave Pulse',
-    renderFunction: renderWavePulsePacket,
-  ),
-  // Add more effects here as you create their render functions
 ];
 
 LedEffect? getEffectById(String id) {
   try {
     return availableEffects.firstWhere((effect) => effect.id == id);
-  } catch (e) {
-    return null; // Not found
+  } catch (_) {
+    return null;
   }
 }

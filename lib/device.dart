@@ -1,6 +1,6 @@
 import 'dart:convert';
-
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:udp_master/led_effects.dart'; // Ensure this import is present
 
 enum DeviceAction {
   add,
@@ -28,7 +28,7 @@ class LedDevice {
   final String ip;
   final int port;
   final int ledCount;
-  String effect;
+  String effect; // Mutable to allow fallback
   bool isEnabled;
   final DeviceType type;
 
@@ -43,7 +43,6 @@ class LedDevice {
   });
 
   LedDevice copyWith({
-    String? id,
     String? name,
     String? ip,
     int? port,
@@ -52,37 +51,65 @@ class LedDevice {
     String? effect,
     bool? isEnabled,
   }) {
+    String validatedEffectId = effect ?? this.effect;
+
+    if (effect != null && availableEffects.isNotEmpty) {
+      bool isNewEffectValid = availableEffects.any((e) => e.id == effect);
+      if (!isNewEffectValid) {
+        validatedEffectId = availableEffects.first.id; // Fallback for new effect
+      }
+    } else if (effect != null && availableEffects.isEmpty) {
+      // If effects list is empty, we can't validate; keep what was passed or old.
+      // Or assign a placeholder if that's preferable.
+      validatedEffectId = effect; // Or consider a placeholder like "no-effects"
+    }
+
+
     return LedDevice(
       name: name ?? this.name,
       ip: ip ?? this.ip,
       port: port ?? this.port,
       ledCount: ledCount ?? this.ledCount,
       type: type ?? this.type,
-      effect: effect ?? this.effect,
+      effect: validatedEffectId, // Use validated or original
       isEnabled: isEnabled ?? this.isEnabled,
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'name': name,
-    'ip': ip,
-    'port': port,
-    'ledCount': ledCount,
-    'effect': effect,
-    'isEnabled': isEnabled,
-    'type': type.name,
-  };
+        'name': name,
+        'ip': ip,
+        'port': port,
+        'ledCount': ledCount,
+        'effect': effect,
+        'isEnabled': isEnabled,
+        'type': type.name,
+      };
 
   factory LedDevice.fromJson(Map<String, dynamic> json) {
+    String loadedEffectId;
+
+    if (availableEffects.isNotEmpty) {
+      loadedEffectId = json['effect'] ?? availableEffects.first.id;
+      bool isValidEffect = availableEffects.any((e) => e.id == loadedEffectId);
+      if (!isValidEffect) {
+        loadedEffectId = availableEffects.first.id; // Fallback
+      }
+    } else {
+      // No effects available to validate against or fallback to.
+      // Use the effect from JSON if present, otherwise a placeholder.
+      loadedEffectId = json['effect'] ?? 'no-effects-available';
+    }
+
     return LedDevice(
-      name: json['name'],
-      ip: json['ip'],
+      name: json['name'] ?? 'Unknown Device',
+      ip: json['ip'] ?? '0.0.0.0',
       port: json['port'] ?? 21324,
-      ledCount: json['ledCount'],
-      effect: json['effect'] ?? 'linear-fill',
+      ledCount: json['ledCount'] ?? 0,
+      effect: loadedEffectId, // Use the validated/fallback ID
       isEnabled: json['isEnabled'] ?? true,
       type: DeviceType.values.firstWhere(
-        (e) => e.name == (json['type'] ?? 'strip'),
+        (e) => e.name == (json['type'] ?? DeviceType.strip.name),
         orElse: () => DeviceType.strip,
       ),
     );
@@ -97,23 +124,14 @@ Future<void> updateDevices(List<LedDevice> devices) async {
 
 Future<List<LedDevice>> loadDevices() async {
   final prefs = await SharedPreferences.getInstance();
-  //   print(prefs.getKeys().fold<Map<String, Object?>>({}, (map, key) {
-  //   map[key] = prefs.get(key);
-  //   return map;
-  // }));
   final deviceList = prefs.getStringList('devices') ?? [];
-  return deviceList.map((e) => LedDevice.fromJson(json.decode(e))).toList();
+  return deviceList
+      .map((e) => LedDevice.fromJson(json.decode(e)))
+      .toList();
 }
 
 Future<void> addNewDevice(LedDevice newDevice) async {
-  final prefs = await SharedPreferences.getInstance();
-  final deviceList = prefs.getStringList('devices') ?? [];
-  final existingDevices = deviceList
-      .map((e) => LedDevice.fromJson(json.decode(e)))
-      .toList();
-  existingDevices.add(newDevice);
-  final updatedList = existingDevices
-      .map((e) => json.encode(e.toJson()))
-      .toList();
-  await prefs.setStringList('devices', updatedList);
+  List<LedDevice> existingDevices = await loadDevices(); // Use loadDevices to ensure validation
+  existingDevices.add(newDevice); // newDevice might need validation if constructed directly before adding
+  await updateDevices(existingDevices);
 }

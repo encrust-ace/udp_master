@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'led_effects.dart';
-import 'device.dart';
+import 'device.dart'; // Your LedDevice model
 
 RawDatagramSocket? _socket;
 
@@ -12,7 +12,8 @@ Future<void> _ensureSocketInitialized() async {
       _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
     } catch (e) {
       if (kDebugMode) {
-        print("Error initializing socket: $e");
+        // Minimal print for error
+        // print("Socket init error: $e");
       }
     }
   }
@@ -20,50 +21,52 @@ Future<void> _ensureSocketInitialized() async {
 
 Future<void> sendUdpPacketsToDevices(
   List<LedDevice> targetDevices,
-  double volume,
+  double volume, // Assumed to be normalized 0.0 - 1.0
 ) async {
   await _ensureSocketInitialized();
   if (_socket == null) {
-    if (kDebugMode) {
-      print("UDP Socket not initialized. Cannot send packets.");
-    }
     return;
   }
 
-  double currentHue = (DateTime.now().millisecondsSinceEpoch % 3600) / 3600.0;
+  double currentHue = (DateTime.now().millisecondsSinceEpoch % 36000) / 36000.0;
+
   for (var device in targetDevices) {
     if (!device.isEnabled) continue;
 
-    LedEffect? effect = getEffectById(
-      device.effect,
-    ); // Get effect by ID stored in device
+    LedEffect? effect = getEffectById(device.effect);
+
     if (effect == null) {
-      if (kDebugMode) {
-        print(
-          "Warning: Effect with ID '${device.effect}' not found for device ${device.name}. Skipping.",
-        );
+      if (availableEffects.isNotEmpty) {
+        effect = availableEffects.first;
+      } else {
+        continue;
       }
-      continue;
     }
 
-    // Call the specific render function for the selected effect
     List<int> packetData = effect.renderFunction(
+      deviceIpKey: device.ip, // Use device.ip as the key for stateful effects
       ledCount: device.ledCount,
       volume: volume,
-      hue: currentHue, // Pass necessary parameters
+      hue: currentHue,
+      // Optional parameters like peakHueOffset, peakDecayMillis, etc.,
+      // will be passed as null if not explicitly provided here.
+      // The render functions or the lambdas in availableEffects
+      // should handle their defaults.
     );
 
-    try {
-      _socket?.send(packetData, InternetAddress(device.ip), device.port);
-    } catch (e) {
-      if (kDebugMode) {
-        print("Error sending UDP packet to ${device.ip}:${device.port}: $e");
+    if (packetData.isNotEmpty && packetData[0] != 0x00) {
+      try {
+        _socket?.send(packetData, InternetAddress(device.ip), device.port);
+      } catch (e) {
+        if (kDebugMode) {
+          // Minimal print for error
+          // print("UDP send error to ${device.ip}: $e");
+        }
       }
     }
   }
 }
 
-// Call this when your app is closing or visualizer stops permanently
 void disposeSocket() {
   _socket?.close();
   _socket = null;

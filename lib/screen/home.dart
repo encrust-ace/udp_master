@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:udp_master/device.dart';
-import 'package:udp_master/effect_processor.dart';
+import 'package:udp_master/visualizer_provider.dart';
 import 'package:udp_master/led_effects.dart';
 
 class Home extends StatefulWidget {
-  final VisualizerService visualizerService;
+  final VisualizerProvider visualizerProvider;
 
-  const Home({super.key, required this.visualizerService});
+  const Home({super.key, required this.visualizerProvider});
 
   @override
   State<Home> createState() => _HomeState();
@@ -27,7 +27,7 @@ class _HomeState extends State<Home> {
     setState(() {
       _selectedGlobalEffect = effect!;
     });
-    widget.visualizerService.updateAllDeviceEffects(effectId);
+    widget.visualizerProvider.updateAllDeviceEffects(effectId);
   }
 
   void _updateDeviceInService(
@@ -37,22 +37,22 @@ class _HomeState extends State<Home> {
   ) {
     switch (action) {
       case DeviceAction.add:
-        widget.visualizerService.addDevice(device);
+        widget.visualizerProvider.addDevice(device);
         break;
       case DeviceAction.update:
-        widget.visualizerService.updateDevice(device);
+        widget.visualizerProvider.updateDevice(device);
         break;
       case DeviceAction.delete:
-        widget.visualizerService.removeDevice(device.ip);
+        widget.visualizerProvider.removeDevice(device.ip);
         Navigator.of(context).pop(true); // Close the dialog after deletion
         break;
     }
-    Provider.of<VisualizerService>(context, listen: false).updateDevice(device);
+    Provider.of<VisualizerProvider>(context, listen: false).updateDevice(device);
   }
 
   @override
   Widget build(BuildContext context) {
-    final devices = context.watch<VisualizerService>().devices;
+    final devices = context.watch<VisualizerProvider>().devices;
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -264,7 +264,7 @@ class _HomeState extends State<Home> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               SizedBox(
-                                width: 150,
+                                width: 180,
                                 height: 44,
                                 child: DropdownButtonFormField<String>(
                                   value: device.effect,
@@ -298,7 +298,7 @@ class _HomeState extends State<Home> {
                                 ),
                               ),
                               SizedBox(
-                                width: 150,
+                                width: 180,
                                 height: 44,
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(

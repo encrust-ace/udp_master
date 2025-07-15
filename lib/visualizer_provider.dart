@@ -19,14 +19,14 @@ double calculateVolume(List<double> samples) {
 const MethodChannel _platform = MethodChannel("mic_channel");
 const EventChannel _micStreamChannel = EventChannel('mic_stream');
 
-class VisualizerService with ChangeNotifier {
-  static final VisualizerService _instance = VisualizerService._internal();
+class VisualizerProvider with ChangeNotifier {
+  static final VisualizerProvider _instance = VisualizerProvider._internal();
 
-  factory VisualizerService() {
+  factory VisualizerProvider() {
     return _instance;
   }
 
-  VisualizerService._internal();
+  VisualizerProvider._internal();
 
   bool _isRunning = false;
   bool get isRunning => _isRunning;

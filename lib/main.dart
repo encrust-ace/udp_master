@@ -4,13 +4,13 @@ import 'package:udp_master/screen/add_device.dart';
 import 'package:udp_master/screen/home.dart';
 import 'package:flutter/services.dart';
 
-import 'effect_processor.dart';
+import 'visualizer_provider.dart';
 
 void main() {
   runApp(
     ChangeNotifierProvider(
       create: (context) =>
-          VisualizerService(),
+          VisualizerProvider(),
       child: const MyApp(),
     ),
   );
@@ -42,7 +42,7 @@ class VisualizerScreen extends StatefulWidget {
 }
 
 class _VisualizerScreenState extends State<VisualizerScreen> {
-  late VisualizerService _visualizerService;
+  late VisualizerProvider _visualizerProvider;
   bool _isInitialDependenciesMet = false;
   int currentPageIndex = 0;
   String selectedEffect = 'linear-fill';
@@ -53,8 +53,8 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInitialDependenciesMet) {
-      _visualizerService = Provider.of<VisualizerService>(context, listen: true);
-      _visualizerService.loadAndSetInitialDevices();
+      _visualizerProvider = Provider.of<VisualizerProvider>(context, listen: true);
+      _visualizerProvider.loadAndSetInitialDevices();
       // Or, if you need to watch it for this screen:
       // final service = context.watch<VisualizerService>();
       // service.loadAndSetInitialDevices();
@@ -88,12 +88,12 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
           ),
         ],
       ),
-      body: [Home(visualizerService: _visualizerService), AddDevice()][currentPageIndex],
+      body: [Home(visualizerProvider: _visualizerProvider), AddDevice()][currentPageIndex],
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          await _visualizerService.toggleVisualizer();
+          await _visualizerProvider.toggleVisualizer();
         },
-        backgroundColor: _visualizerService.isRunning
+        backgroundColor: _visualizerProvider.isRunning
             ? Colors.redAccent
             : Theme.of(context).colorScheme.secondary,
         foregroundColor: Colors.white,
@@ -105,8 +105,8 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
             return ScaleTransition(scale: animation, child: child);
           },
           child: Icon(
-            _visualizerService.isRunning ? Icons.stop_rounded : Icons.play_arrow_rounded,
-            key: ValueKey<bool>(_visualizerService.isRunning),
+            _visualizerProvider.isRunning ? Icons.stop_rounded : Icons.play_arrow_rounded,
+            key: ValueKey<bool>(_visualizerProvider.isRunning),
             size: 36,
           ),
         ),
