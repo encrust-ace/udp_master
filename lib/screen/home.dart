@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
 import 'package:udp_master/device.dart';
 import 'package:udp_master/effect_processor.dart';
 import 'package:udp_master/main.dart';
-import 'package:udp_master/udp_sender.dart';
 
 class Home extends StatefulWidget {
   const Home({super.key});
@@ -15,70 +15,25 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  bool isRunning = false;
   List<LedDevice> devices = [];
   String selectedEffect = 'linear-fill';
   final List<String> effects = ['linear-fill', 'center-pulse', 'wave-pulse'];
+  late VisualizerService _visualizerService;
 
   @override
   void initState() {
     super.initState();
-    _loadDevices();
+     _visualizerService = Provider.of<VisualizerService>(context, listen: false);
+    // Listen to changes in the service's isRunning state to rebuild the FAB
+    _visualizerService.addListener(_onVisualizerStateChanged);
   }
 
-  Future<void> _loadDevices() async {
-    final savedDevices = await loadDevices();
-    setState(() {
-      devices = savedDevices;
-    });
-  }
-
-  Future<void> startMic() async {
-    await platform.invokeMethod("startMic");
-  }
-
-  Future<void> stopMic() async {
-    await platform.invokeMethod("stopMic");
-  }
-
-  Future<bool> ensureMicPermission() async {
-    var status = await Permission.microphone.status;
-    if (!status.isGranted) {
-      status = await Permission.microphone.request();
-    }
-    return status.isGranted;
-  }
-
-  StreamSubscription? micSubscription;
-
-  void toggleVisualizer() async {
-    if (!isRunning) {
-      bool granted = await ensureMicPermission();
-      if (!granted) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Microphone permission required')),
-          );
-        }
-        return;
-      }
-    }
-
-    setState(() => isRunning = !isRunning);
-
-    if (isRunning) {
-      await startMic();
-      micSubscription = micStream.receiveBroadcastStream().listen((samples) {
-        double volume = calculateVolume((samples as List).cast<double>());
-        sendUdpPacketsToDevices(
-          devices.where((d) => d.isEnabled).toList(),
-          volume,
-        );
+    void _onVisualizerStateChanged() {
+    // This will trigger a rebuild if the FAB's appearance depends on isRunning
+    if (mounted) {
+      setState(() {
+        devices = _visualizerService.devices;
       });
-    } else {
-      await stopMic();
-      await micSubscription?.cancel();
-      micSubscription = null;
     }
   }
 
@@ -97,12 +52,6 @@ class _HomeState extends State<Home> {
     setState(() {
       updateDevices(devices);
     });
-  }
-
-  @override
-  void dispose() {
-    micSubscription?.cancel();
-    super.dispose();
   }
 
   @override
@@ -401,16 +350,6 @@ class _HomeState extends State<Home> {
                   ),
                 );
               },
-            ),
-            SwitchListTile(
-              title: const Text(
-                "Start Visualizer",
-                style: TextStyle(fontSize: 16),
-              ),
-              value: isRunning,
-              onChanged: (_) => toggleVisualizer(),
-              secondary: Icon(isRunning ? Icons.mic : Icons.mic_off),
-              activeColor: Theme.of(context).colorScheme.secondary,
             ),
           ],
         ),
