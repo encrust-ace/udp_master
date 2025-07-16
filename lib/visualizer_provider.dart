@@ -32,6 +32,13 @@ class VisualizerProvider with ChangeNotifier {
 
   VisualizerProvider._internal();
 
+  CastMode _castMode = CastMode.audio;
+  CastMode get castMode => _castMode;
+  set castMode(CastMode value) {
+    _castMode = value;
+    notifyListeners();
+  }
+
   final _record = AudioRecorder(); // For Linux
 
   bool _isRunning = false;

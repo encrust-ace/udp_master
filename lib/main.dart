@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:udp_master/device.dart';
 import 'package:udp_master/screen/add_device.dart';
 import 'package:udp_master/screen/home.dart';
 import 'package:flutter/services.dart';
@@ -44,8 +45,6 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
   late VisualizerProvider _visualizerProvider;
   bool _isInitialDependenciesMet = false;
   int currentPageIndex = 0;
-  String selectedEffect = 'linear-fill';
-  final List<String> effects = ['linear-fill', 'center-pulse', 'wave-pulse'];
 
   @override
   void didChangeDependencies() {
@@ -66,7 +65,32 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("UDP Master")),
+      appBar: AppBar(
+        title: const Text("UDP Master"),
+        actions: [
+          Row(
+            children: [
+              Text(
+                _visualizerProvider.castMode == CastMode.video
+                    ? "Video"
+                    : "Audio",
+              ),
+              Switch(
+                padding: EdgeInsets.only(right: 50),
+                value: _visualizerProvider.castMode == CastMode.video,
+                thumbColor: const WidgetStatePropertyAll<Color>(Colors.black),
+                onChanged: (bool value) {
+                  if (value) {
+                    _visualizerProvider.castMode = CastMode.video;
+                  } else {
+                    _visualizerProvider.castMode = CastMode.audio;
+                  }
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
       resizeToAvoidBottomInset: true,
       bottomNavigationBar: NavigationBar(
         onDestinationSelected: (int index) {

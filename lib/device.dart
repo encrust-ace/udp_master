@@ -1,5 +1,7 @@
 import 'package:udp_master/led_effects.dart'; // Ensure this import is present
 
+enum CastMode { audio, video }
+
 enum DeviceAction { add, update, delete }
 
 enum DeviceType { strip, single, matrix }
