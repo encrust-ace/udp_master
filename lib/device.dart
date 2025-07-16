@@ -1,12 +1,6 @@
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp_master/led_effects.dart'; // Ensure this import is present
 
-enum DeviceAction {
-  add,
-  update,
-  delete,
-}
+enum DeviceAction { add, update, delete }
 
 enum DeviceType { strip, single, matrix }
 
@@ -56,14 +50,14 @@ class LedDevice {
     if (effect != null && availableEffects.isNotEmpty) {
       bool isNewEffectValid = availableEffects.any((e) => e.id == effect);
       if (!isNewEffectValid) {
-        validatedEffectId = availableEffects.first.id; // Fallback for new effect
+        validatedEffectId =
+            availableEffects.first.id; // Fallback for new effect
       }
     } else if (effect != null && availableEffects.isEmpty) {
       // If effects list is empty, we can't validate; keep what was passed or old.
       // Or assign a placeholder if that's preferable.
       validatedEffectId = effect; // Or consider a placeholder like "no-effects"
     }
-
 
     return LedDevice(
       name: name ?? this.name,
@@ -77,14 +71,14 @@ class LedDevice {
   }
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'ip': ip,
-        'port': port,
-        'ledCount': ledCount,
-        'effect': effect,
-        'isEnabled': isEnabled,
-        'type': type.name,
-      };
+    'name': name,
+    'ip': ip,
+    'port': port,
+    'ledCount': ledCount,
+    'effect': effect,
+    'isEnabled': isEnabled,
+    'type': type.name,
+  };
 
   factory LedDevice.fromJson(Map<String, dynamic> json) {
     String loadedEffectId;
@@ -114,24 +108,4 @@ class LedDevice {
       ),
     );
   }
-}
-
-Future<void> updateDevices(List<LedDevice> devices) async {
-  final prefs = await SharedPreferences.getInstance();
-  final deviceList = devices.map((e) => json.encode(e.toJson())).toList();
-  await prefs.setStringList('devices', deviceList);
-}
-
-Future<List<LedDevice>> loadDevices() async {
-  final prefs = await SharedPreferences.getInstance();
-  final deviceList = prefs.getStringList('devices') ?? [];
-  return deviceList
-      .map((e) => LedDevice.fromJson(json.decode(e)))
-      .toList();
-}
-
-Future<void> addNewDevice(LedDevice newDevice) async {
-  List<LedDevice> existingDevices = await loadDevices(); // Use loadDevices to ensure validation
-  existingDevices.add(newDevice); // newDevice might need validation if constructed directly before adding
-  await updateDevices(existingDevices);
 }

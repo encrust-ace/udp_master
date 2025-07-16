@@ -23,31 +23,14 @@ class _HomeState extends State<Home> {
   }
 
   void _applyGlobalEffect(BuildContext context, String effectId) {
-    LedEffect? effect = getEffectById(effectId);
-    setState(() {
-      _selectedGlobalEffect = effect!;
-    });
-    widget.visualizerProvider.updateAllDeviceEffects(effectId);
-  }
-
-  void _updateDeviceInService(
-    BuildContext context,
-    LedDevice device,
-    DeviceAction action,
-  ) {
-    switch (action) {
-      case DeviceAction.add:
-        widget.visualizerProvider.addDevice(device);
-        break;
-      case DeviceAction.update:
-        widget.visualizerProvider.updateDevice(device);
-        break;
-      case DeviceAction.delete:
-        widget.visualizerProvider.removeDevice(device.ip);
-        Navigator.of(context).pop(true); // Close the dialog after deletion
-        break;
-    }
-    Provider.of<VisualizerProvider>(context, listen: false).updateDevice(device);
+    List<LedDevice> devices = widget.visualizerProvider.devices;
+    List<LedDevice> updatedDevices = devices.map((device) {
+      return device.copyWith(effect: effectId);
+    }).toList();
+    widget.visualizerProvider.deviceActions(
+      updatedDevices,
+      DeviceAction.update,
+    );
   }
 
   @override
@@ -110,11 +93,10 @@ class _HomeState extends State<Home> {
                               ),
                               TextButton(
                                 onPressed: () {
-                                  _updateDeviceInService(
-                                    context,
+                                  widget.visualizerProvider.deviceActions([
                                     device,
-                                    DeviceAction.delete,
-                                  );
+                                  ], DeviceAction.delete);
+                                  Navigator.of(context).pop(true);
                                 },
                                 child: const Text(
                                   'Delete',
@@ -125,12 +107,6 @@ class _HomeState extends State<Home> {
                           ),
                         ) ??
                         false;
-                  },
-                  onDismissed: (direction) {
-                    setState(() {
-                      devices.removeAt(index);
-                    });
-                    updateDevices(devices);
                   },
                   background: Container(
                     alignment: Alignment.centerRight,
@@ -288,11 +264,9 @@ class _HomeState extends State<Home> {
                                       .toList(),
                                   onChanged: (val) {
                                     if (val != null) {
-                                      _updateDeviceInService(
-                                        context,
+                                      widget.visualizerProvider.deviceActions([
                                         device.copyWith(effect: val),
-                                        DeviceAction.update,
-                                      );
+                                      ], DeviceAction.update);
                                     }
                                   },
                                 ),
@@ -344,11 +318,11 @@ class _HomeState extends State<Home> {
                                         ),
                                   ),
                                   onPressed: () {
-                                    setState(() {
-                                      devices[index].isEnabled =
-                                          !devices[index].isEnabled;
-                                    });
-                                    updateDevices(devices);
+                                    widget.visualizerProvider.deviceActions([
+                                      device.copyWith(
+                                        isEnabled: !device.isEnabled,
+                                      ),
+                                    ], DeviceAction.update);
                                   },
                                 ),
                               ),

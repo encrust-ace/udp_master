@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:udp_master/device.dart';
+import 'package:udp_master/visualizer_provider.dart';
 
 class AddDevice extends StatefulWidget {
-  const AddDevice({super.key});
+  final VisualizerProvider visualizerProvider;
+
+  const AddDevice({super.key, required this.visualizerProvider});
 
   @override
   State<AddDevice> createState() => _AddDeviceState();
@@ -33,14 +36,14 @@ class _AddDeviceState extends State<AddDevice> {
     final ip = _ipController.text.trim();
 
     // Load existing devices
-    final existingDevices = await loadDevices();
+    final existingDevices = widget.visualizerProvider.devices;
 
     // Check for duplicate (by name or IP)
     final alreadyExists = existingDevices.any(
       (d) => d.name.toLowerCase() == name.toLowerCase() || d.ip == ip,
     );
 
-    if (!mounted) return; // <-- Add this guard
+    if (!mounted) return;
 
     if (alreadyExists) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -61,9 +64,9 @@ class _AddDeviceState extends State<AddDevice> {
       type: _selectedDeviceType,
       port: int.parse(_portController.text),
     );
-    await addNewDevice(device);
+    await widget.visualizerProvider.deviceActions([device], DeviceAction.add);
 
-    if (!mounted) return; // <-- Add this guard
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(

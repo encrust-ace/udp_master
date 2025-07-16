@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:async';
@@ -6,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp_master/device.dart';
 import 'package:udp_master/udp_sender.dart';
 
@@ -37,55 +39,63 @@ class VisualizerProvider with ChangeNotifier {
 
   StreamSubscription? _micSubscription;
 
-
   List<LedDevice> _devices = [];
   UnmodifiableListView<LedDevice> get devices => UnmodifiableListView(_devices);
 
-
   // --- Device Management ---
-  Future<void> loadAndSetInitialDevices() async {
-    _devices = await loadDevices(); // Your existing function to load from SharedPreferences/DB
-    if (kDebugMode) {
-      print("VisualizerService: Loaded ${_devices.length} devices.");
+
+  Future<List<LedDevice>> _loadDevices() async {
+    final prefs = await SharedPreferences.getInstance();
+    final deviceList = prefs.getStringList('devices') ?? [];
+    _devices = deviceList
+        .map((e) => LedDevice.fromJson(json.decode(e)))
+        .toList();
+    return _devices;
+  }
+
+  Future<void> _deviceActions(
+    List<LedDevice> devices,
+    DeviceAction action,
+  ) async {
+    List<LedDevice> existingDevices = await _loadDevices();
+    switch (action) {
+      case DeviceAction.add:
+        existingDevices.addAll(devices);
+        break;
+      case DeviceAction.update:
+        for (var device in devices) {
+          int index = existingDevices.indexWhere((d) => d.ip == device.ip);
+          if (index != -1) {
+            existingDevices[index] = device;
+          }
+        }
+        break;
+      case DeviceAction.delete:
+        for (var device in devices) {
+          existingDevices.removeWhere((d) => d.ip == device.ip);
+        }
+        break;
     }
+    final prefs = await SharedPreferences.getInstance();
+    final deviceList = existingDevices
+        .map((e) => json.encode(e.toJson()))
+        .toList();
+    await prefs.setStringList('devices', deviceList);
+  }
+
+  Future<void> loadDevices() async {
+    await _loadDevices();
     notifyListeners(); // Notify that devices are loaded/changed
   }
 
-  Future<void> addDevice(LedDevice newDevice) async {
-    _devices.add(newDevice);
-    await updateDevices(_devices); // Your existing function to save all devices
-    if (kDebugMode) {
-      print("VisualizerService: Added device '${newDevice.name}'.");
-    }
-    notifyListeners();
+  Future<void> deviceActions(
+    List<LedDevice> updatedDevices,
+    DeviceAction action,
+  ) async {
+    await _deviceActions(updatedDevices, action);
+    loadDevices();
   }
 
-  Future<void> updateDevice(LedDevice updatedDevice) async {
-    int index = _devices.indexWhere((d) => d.ip == updatedDevice.ip); // Assuming LedDevice has a unique 'id'
-    if (index != -1) {
-      _devices[index] = updatedDevice;
-      await updateDevices(_devices);
-      if (kDebugMode) {
-        print("VisualizerService: Updated device '${updatedDevice.name}'.");
-      }
-      notifyListeners();
-    }
-  }
-
-  Future<void> removeDevice(String ip) async { // Remove by ID
-    _devices.removeWhere((d) => d.ip == ip);
-    await updateDevices(_devices);
-    if (kDebugMode) {
-      print("VisualizerService: Removed device with ID '$ip'.");
-    }
-    notifyListeners();
-  }
-
-  Future<void> updateAllDeviceEffects(String effect) async {
-    _devices = _devices.map((d) => d.copyWith(effect: effect)).toList();
-    await updateDevices(_devices);
-    notifyListeners();
-  }
   // --- End Device Management ---
 
   Future<bool> _ensureMicPermission() async {
@@ -132,20 +142,20 @@ class VisualizerProvider with ChangeNotifier {
       await _startMicPlatform();
       _micSubscription = _micStreamChannel.receiveBroadcastStream().listen(
         (samples) {
-        if (!_isRunning || _devices.isEmpty) return; // Guard clause
+          if (!_isRunning || _devices.isEmpty) return; // Guard clause
 
-        // Ensure samples is List<double>
-        List<double> doubleSamples;
-        if (samples is List<dynamic>) {
-          doubleSamples = samples.map((s) => (s as num).toDouble()).toList();
-        } else {
-          if (kDebugMode) {
-            print(
-              "VisualizerService: Received unexpected sample type: ${samples.runtimeType}",
-            );
+          // Ensure samples is List<double>
+          List<double> doubleSamples;
+          if (samples is List<dynamic>) {
+            doubleSamples = samples.map((s) => (s as num).toDouble()).toList();
+          } else {
+            if (kDebugMode) {
+              print(
+                "VisualizerService: Received unexpected sample type: ${samples.runtimeType}",
+              );
+            }
+            return;
           }
-          return;
-        }
 
           double volume = calculateVolume(doubleSamples);
           sendUdpPacketsToDevices(
@@ -154,18 +164,18 @@ class VisualizerProvider with ChangeNotifier {
           );
         },
         onError: (error) {
-        if (kDebugMode) {
-          print("VisualizerService: Error on mic stream: $error");
-        }
+          if (kDebugMode) {
+            print("VisualizerService: Error on mic stream: $error");
+          }
           stopVisualizer();
         },
         onDone: () {
-        if (kDebugMode) {
-          print("VisualizerService: Mic stream done.");
-        }
-        if (_isRunning) {
-          stopVisualizer();
-        }
+          if (kDebugMode) {
+            print("VisualizerService: Mic stream done.");
+          }
+          if (_isRunning) {
+            stopVisualizer();
+          }
         },
       );
     }
@@ -204,27 +214,33 @@ class VisualizerProvider with ChangeNotifier {
       return;
     }
 
-    await _record.startStream(
-      const RecordConfig(encoder: AudioEncoder.pcm16bits, sampleRate: 44100, numChannels: 1),
-    ).then((stream) {
-      _micSubscription = stream.listen((data) {
-        if (!_isRunning || _devices.isEmpty) return;
+    await _record
+        .startStream(
+          const RecordConfig(
+            encoder: AudioEncoder.pcm16bits,
+            sampleRate: 44100,
+            numChannels: 1,
+          ),
+        )
+        .then((stream) {
+          _micSubscription = stream.listen((data) {
+            if (!_isRunning || _devices.isEmpty) return;
 
-        final int sampleCount = data.length ~/ 2;
-        List<double> samples = List.generate(sampleCount, (i) {
-          int lsb = data[2 * i];
-          int msb = data[2 * i + 1];
-          int sample = (msb << 8) | lsb;
-          if (sample & 0x8000 != 0) sample -= 0x10000;
-          return sample / 32768.0;
+            final int sampleCount = data.length ~/ 2;
+            List<double> samples = List.generate(sampleCount, (i) {
+              int lsb = data[2 * i];
+              int msb = data[2 * i + 1];
+              int sample = (msb << 8) | lsb;
+              if (sample & 0x8000 != 0) sample -= 0x10000;
+              return sample / 32768.0;
+            });
+
+            double volume = calculateVolume(samples);
+            sendUdpPacketsToDevices(
+              _devices.where((d) => d.isEnabled).toList(),
+              volume,
+            );
+          });
         });
-
-        double volume = calculateVolume(samples);
-        sendUdpPacketsToDevices(
-          _devices.where((d) => d.isEnabled).toList(),
-          volume,
-        );
-      });
-    });
   }
 }

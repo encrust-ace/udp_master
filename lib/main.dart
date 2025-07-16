@@ -9,8 +9,7 @@ import 'visualizer_provider.dart';
 void main() {
   runApp(
     ChangeNotifierProvider(
-      create: (context) =>
-          VisualizerProvider(),
+      create: (context) => VisualizerProvider(),
       child: const MyApp(),
     ),
   );
@@ -48,20 +47,21 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
   String selectedEffect = 'linear-fill';
   final List<String> effects = ['linear-fill', 'center-pulse', 'wave-pulse'];
 
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInitialDependenciesMet) {
-      _visualizerProvider = Provider.of<VisualizerProvider>(context, listen: true);
-      _visualizerProvider.loadAndSetInitialDevices();
+      _visualizerProvider = Provider.of<VisualizerProvider>(
+        context,
+        listen: true,
+      );
+      _visualizerProvider.loadDevices();
       // Or, if you need to watch it for this screen:
       // final service = context.watch<VisualizerService>();
       // service.loadAndSetInitialDevices();
       _isInitialDependenciesMet = true;
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +88,10 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
           ),
         ],
       ),
-      body: [Home(visualizerProvider: _visualizerProvider), AddDevice()][currentPageIndex],
+      body: [
+        Home(visualizerProvider: _visualizerProvider),
+        AddDevice(visualizerProvider: _visualizerProvider),
+      ][currentPageIndex],
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await _visualizerProvider.toggleVisualizer();
@@ -105,7 +108,9 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
             return ScaleTransition(scale: animation, child: child);
           },
           child: Icon(
-            _visualizerProvider.isRunning ? Icons.stop_rounded : Icons.play_arrow_rounded,
+            _visualizerProvider.isRunning
+                ? Icons.stop_rounded
+                : Icons.play_arrow_rounded,
             key: ValueKey<bool>(_visualizerProvider.isRunning),
             size: 36,
           ),
