@@ -1,9 +1,11 @@
 import 'dart:collection';
+import 'dart:io';
 import 'dart:math';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
 import 'package:udp_master/device.dart';
 import 'package:udp_master/udp_sender.dart';
 
@@ -27,6 +29,8 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   VisualizerProvider._internal();
+
+  final _record = AudioRecorder(); // For Linux
 
   bool _isRunning = false;
   bool get isRunning => _isRunning;
@@ -85,10 +89,9 @@ class VisualizerProvider with ChangeNotifier {
   // --- End Device Management ---
 
   Future<bool> _ensureMicPermission() async {
+    if (!Platform.isAndroid && !Platform.isIOS) return true;
     var status = await Permission.microphone.status;
-    if (!status.isGranted) {
-      status = await Permission.microphone.request();
-    }
+    if (!status.isGranted) status = await Permission.microphone.request();
     return status.isGranted;
   }
 
@@ -123,17 +126,12 @@ class VisualizerProvider with ChangeNotifier {
       return false;
     }
 
-    await _startMicPlatform();
-    if (_devices.isEmpty) {
-      if (kDebugMode) {
-        print(
-          "VisualizerService: No target devices set. Visualizer will start but not send data yet.",
-        );
-      }
-    }
-
-    _micSubscription = _micStreamChannel.receiveBroadcastStream().listen(
-      (samples) {
+    if (Platform.isLinux) {
+      await _startMicLinux();
+    } else {
+      await _startMicPlatform();
+      _micSubscription = _micStreamChannel.receiveBroadcastStream().listen(
+        (samples) {
         if (!_isRunning || _devices.isEmpty) return; // Guard clause
 
         // Ensure samples is List<double>
@@ -149,27 +147,28 @@ class VisualizerProvider with ChangeNotifier {
           return;
         }
 
-        double volume = calculateVolume(doubleSamples);
-        sendUdpPacketsToDevices(
-          _devices.where((d) => d.isEnabled).toList(),
-          volume,
-        );
-      },
-      onError: (error) {
+          double volume = calculateVolume(doubleSamples);
+          sendUdpPacketsToDevices(
+            _devices.where((d) => d.isEnabled).toList(),
+            volume,
+          );
+        },
+        onError: (error) {
         if (kDebugMode) {
           print("VisualizerService: Error on mic stream: $error");
         }
-        stopVisualizer();
-      },
-      onDone: () {
+          stopVisualizer();
+        },
+        onDone: () {
         if (kDebugMode) {
           print("VisualizerService: Mic stream done.");
         }
         if (_isRunning) {
           stopVisualizer();
         }
-      },
-    );
+        },
+      );
+    }
 
     _isRunning = true;
     notifyListeners(); // Notify UI or other parts of the app
@@ -179,9 +178,14 @@ class VisualizerProvider with ChangeNotifier {
   Future<void> stopVisualizer() async {
     if (!_isRunning && _micSubscription == null) return;
 
-    await _micSubscription?.cancel();
-    _micSubscription = null;
-    await _stopMicPlatform();
+    if (Platform.isLinux) {
+      await _record.stop();
+    } else {
+      await _micSubscription?.cancel();
+      _micSubscription = null;
+      await _stopMicPlatform();
+    }
+
     _isRunning = false;
     notifyListeners();
   }
@@ -192,5 +196,35 @@ class VisualizerProvider with ChangeNotifier {
     } else {
       await startVisualizer();
     }
+  }
+
+  Future<void> _startMicLinux() async {
+    if (!(await _record.hasPermission())) {
+      if (kDebugMode) print("VisualizerService (Linux): No mic permission.");
+      return;
+    }
+
+    await _record.startStream(
+      const RecordConfig(encoder: AudioEncoder.pcm16bits, sampleRate: 44100, numChannels: 1),
+    ).then((stream) {
+      _micSubscription = stream.listen((data) {
+        if (!_isRunning || _devices.isEmpty) return;
+
+        final int sampleCount = data.length ~/ 2;
+        List<double> samples = List.generate(sampleCount, (i) {
+          int lsb = data[2 * i];
+          int msb = data[2 * i + 1];
+          int sample = (msb << 8) | lsb;
+          if (sample & 0x8000 != 0) sample -= 0x10000;
+          return sample / 32768.0;
+        });
+
+        double volume = calculateVolume(samples);
+        sendUdpPacketsToDevices(
+          _devices.where((d) => d.isEnabled).toList(),
+          volume,
+        );
+      });
+    });
   }
 }
