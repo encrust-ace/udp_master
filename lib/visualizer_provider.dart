@@ -116,12 +116,12 @@ class VisualizerProvider with ChangeNotifier {
 
       final jsonString = jsonEncode(decodedDevices);
 
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/devices.json');
+      final directory = await getDownloadsDirectory();
+      final file = File('${directory?.path}/devices.json');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Device saved in! ${directory.path}/devices.json'),
+            content: Text('Device saved in! ${directory?.path}/devices.json'),
             backgroundColor: Colors.green,
           ),
         );
