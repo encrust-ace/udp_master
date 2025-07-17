@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:udp_master/device.dart';
 import 'package:udp_master/screen/add_device.dart';
 import 'package:udp_master/screen/home.dart';
 import 'package:flutter/services.dart';
@@ -69,24 +68,38 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
         title: const Text("UDP Master"),
         actions: [
           Row(
+            spacing: 16,
             children: [
-              Text(
-                _visualizerProvider.castMode == CastMode.video
-                    ? "Video"
-                    : "Audio",
-              ),
-              Switch(
-                padding: EdgeInsets.only(right: 50),
-                value: _visualizerProvider.castMode == CastMode.video,
-                thumbColor: const WidgetStatePropertyAll<Color>(Colors.black),
-                onChanged: (bool value) {
-                  if (value) {
-                    _visualizerProvider.castMode = CastMode.video;
-                  } else {
-                    _visualizerProvider.castMode = CastMode.audio;
-                  }
+              ElevatedButton(
+                onPressed: () {
+                  _visualizerProvider.exportDevicesToJsonFile(context);
                 },
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: Text("Export Devices"),
               ),
+              SizedBox(width: 8),
+              // Text(
+              //   _visualizerProvider.castMode == CastMode.video
+              //       ? "Video"
+              //       : "Audio",
+              // ),
+              // Switch(
+              //   padding: EdgeInsets.only(right: 50),
+              //   value: _visualizerProvider.castMode == CastMode.video,
+              //   thumbColor: const WidgetStatePropertyAll<Color>(Colors.black),
+              //   onChanged: (bool value) {
+              //     if (value) {
+              //       _visualizerProvider.castMode = CastMode.video;
+              //     } else {
+              //       _visualizerProvider.castMode = CastMode.audio;
+              //     }
+              //   },
+              // ),
             ],
           ),
         ],

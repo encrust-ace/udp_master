@@ -4,7 +4,9 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -101,6 +103,36 @@ class VisualizerProvider with ChangeNotifier {
   ) async {
     await _deviceActions(updatedDevices, action);
     loadDevices();
+  }
+
+  // Export saved devices
+  Future<File?> exportDevicesToJsonFile(BuildContext context) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deviceList = prefs.getStringList('devices') ?? [];
+
+      // Decode each stringified device to proper Map
+      final decodedDevices = deviceList.map((e) => json.decode(e)).toList();
+
+      final jsonString = jsonEncode(decodedDevices);
+
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/devices.json');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Device saved in! ${directory.path}/devices.json'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      return await file.writeAsString(jsonString);
+    } catch (e) {
+      if (kDebugMode) {
+        print("VisualizerService: Failed to export devices to JSON: $e");
+      }
+      return null;
+    }
   }
 
   // --- End Device Management ---

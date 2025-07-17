@@ -226,32 +226,27 @@ class _AddDeviceState extends State<AddDevice> {
                         value == null ? 'Select device type' : null,
                   ),
                 ),
-
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 2,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState?.validate() ?? false) {
-                        _addDevice();
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6.0),
-                        side: const BorderSide(),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 18.0,
-                        horizontal: 18.0,
-                      ),
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    ),
-                    child: const Text("Add Device"),
-                  ),
-                ),
               ],
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (_formKey.currentState?.validate() ?? false) {
+                  _addDevice();
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6.0),
+                  side: const BorderSide(),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 18.0,
+                  horizontal: 18.0,
+                ),
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              ),
+              child: const Text("Add Device"),
             ),
           ],
         ),
