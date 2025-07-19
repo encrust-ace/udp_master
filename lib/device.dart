@@ -31,7 +31,7 @@ class LedDevice {
   LedDevice({
     required this.name,
     required this.ip,
-    this.port = 21324,
+    required this.port,
     required this.ledCount,
     required this.effect,
     this.isEnabled = true,
@@ -100,7 +100,7 @@ class LedDevice {
     return LedDevice(
       name: json['name'] ?? 'Unknown Device',
       ip: json['ip'] ?? '0.0.0.0',
-      port: json['port'] ?? 21324,
+      port: json['port'],
       ledCount: json['ledCount'] ?? 0,
       effect: loadedEffectId, // Use the validated/fallback ID
       isEnabled: json['isEnabled'] ?? true,

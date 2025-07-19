@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:async';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -53,26 +54,46 @@ class VisualizerProvider with ChangeNotifier {
 
   // --- Device Management ---
 
-  Future<List<LedDevice>> _loadDevices() async {
+  Future<List<LedDevice>> loadDevices() async {
     final prefs = await SharedPreferences.getInstance();
     final deviceList = prefs.getStringList('devices') ?? [];
     _devices = deviceList
         .map((e) => LedDevice.fromJson(json.decode(e)))
         .toList();
+    notifyListeners();
     return _devices;
   }
 
-  Future<void> _deviceActions(
+  Future<bool> deviceActions(
+    BuildContext context,
     List<LedDevice> devices,
     DeviceAction action,
   ) async {
-    List<LedDevice> existingDevices = await _loadDevices();
+    List<LedDevice> existingDevices = await loadDevices();
     switch (action) {
       case DeviceAction.add:
-        existingDevices.addAll(devices);
+        for (LedDevice device in devices) {
+          // Check for duplicate (by name or IP)
+          final alreadyExists = existingDevices.any(
+            (d) =>
+                d.name.toLowerCase() == device.name.toLowerCase() ||
+                d.ip == device.ip,
+          );
+
+          if (context.mounted && alreadyExists) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Device with same name or IP already exists!'),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+            return false;
+          }
+          existingDevices.addAll(devices);
+        }
         break;
       case DeviceAction.update:
-        for (var device in devices) {
+        for (LedDevice device in devices) {
           int index = existingDevices.indexWhere((d) => d.ip == device.ip);
           if (index != -1) {
             existingDevices[index] = device;
@@ -80,7 +101,7 @@ class VisualizerProvider with ChangeNotifier {
         }
         break;
       case DeviceAction.delete:
-        for (var device in devices) {
+        for (LedDevice device in devices) {
           existingDevices.removeWhere((d) => d.ip == device.ip);
         }
         break;
@@ -90,19 +111,17 @@ class VisualizerProvider with ChangeNotifier {
         .map((e) => json.encode(e.toJson()))
         .toList();
     await prefs.setStringList('devices', deviceList);
-  }
-
-  Future<void> loadDevices() async {
-    await _loadDevices();
-    notifyListeners(); // Notify that devices are loaded/changed
-  }
-
-  Future<void> deviceActions(
-    List<LedDevice> updatedDevices,
-    DeviceAction action,
-  ) async {
-    await _deviceActions(updatedDevices, action);
-    loadDevices();
+    notifyListeners();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Device ${action}ed successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+    _devices = existingDevices;
+    return true;
   }
 
   // Export saved devices
@@ -132,6 +151,77 @@ class VisualizerProvider with ChangeNotifier {
         print("VisualizerService: Failed to export devices to JSON: $e");
       }
       return null;
+    }
+  }
+
+  Future<bool> importDevicesFromJsonFile(BuildContext context) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        dialogTitle: "Select Devices JSON File",
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        withData: true, // Read file content into memory
+      );
+
+      if (result == null ||
+          result.files.isEmpty ||
+          result.files.single.bytes == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('File is incorrect!'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return false;
+      }
+
+      final bytes = result.files.single.bytes!;
+      final jsonString = utf8.decode(bytes);
+      final List<dynamic> decodedList = jsonDecode(jsonString);
+
+      final List<LedDevice> devicesToAdd = [];
+      for (final device in decodedList) {
+        final alreadyExists = _devices.any(
+          (d) =>
+              d.name.toLowerCase() == device.name.toLowerCase() ||
+              d.ip == device.ip,
+        );
+        if (!alreadyExists) {
+          devicesToAdd.add(device);
+        }
+      }
+
+      devicesToAdd.addAll(_devices);
+
+      final List<String> encodedDevices = devicesToAdd
+          .map((e) => jsonEncode(e))
+          .toList();
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('devices', encodedDevices);
+      _devices = devicesToAdd;
+      notifyListeners();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Devices imported successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      if (kDebugMode) {
+        print("Imported ${encodedDevices.length} devices successfully.");
+      }
+
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error importing devices from file picker: $e");
+      }
+      return false;
     }
   }
 

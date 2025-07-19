@@ -28,6 +28,7 @@ class _HomeState extends State<Home> {
       return device.copyWith(effect: effectId);
     }).toList();
     widget.visualizerProvider.deviceActions(
+      context,
       updatedDevices,
       DeviceAction.update,
     );
@@ -93,9 +94,11 @@ class _HomeState extends State<Home> {
                               ),
                               TextButton(
                                 onPressed: () {
-                                  widget.visualizerProvider.deviceActions([
-                                    device,
-                                  ], DeviceAction.delete);
+                                  widget.visualizerProvider.deviceActions(
+                                    context,
+                                    [device],
+                                    DeviceAction.delete,
+                                  );
                                   Navigator.of(context).pop(true);
                                 },
                                 child: const Text(
@@ -264,9 +267,11 @@ class _HomeState extends State<Home> {
                                       .toList(),
                                   onChanged: (val) {
                                     if (val != null) {
-                                      widget.visualizerProvider.deviceActions([
-                                        device.copyWith(effect: val),
-                                      ], DeviceAction.update);
+                                      widget.visualizerProvider.deviceActions(
+                                        context,
+                                        [device.copyWith(effect: val)],
+                                        DeviceAction.update,
+                                      );
                                     }
                                   },
                                 ),
@@ -318,11 +323,12 @@ class _HomeState extends State<Home> {
                                         ),
                                   ),
                                   onPressed: () {
-                                    widget.visualizerProvider.deviceActions([
-                                      device.copyWith(
-                                        isEnabled: !device.isEnabled,
-                                      ),
-                                    ], DeviceAction.update);
+                                    widget.visualizerProvider
+                                        .deviceActions(context, [
+                                          device.copyWith(
+                                            isEnabled: !device.isEnabled,
+                                          ),
+                                        ], DeviceAction.update);
                                   },
                                 ),
                               ),

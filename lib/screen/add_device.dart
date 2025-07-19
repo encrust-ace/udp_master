@@ -18,7 +18,7 @@ class _AddDeviceState extends State<AddDevice> {
   final TextEditingController _numberOfLEDs = TextEditingController();
   final TextEditingController _ipController = TextEditingController();
   final TextEditingController _portController = TextEditingController(
-    text: '21324',
+    text: '5568',
   );
   DeviceType _selectedDeviceType = DeviceType.strip;
   final _formKey = GlobalKey<FormState>();
@@ -35,26 +35,6 @@ class _AddDeviceState extends State<AddDevice> {
     final name = _nameController.text.trim();
     final ip = _ipController.text.trim();
 
-    // Load existing devices
-    final existingDevices = widget.visualizerProvider.devices;
-
-    // Check for duplicate (by name or IP)
-    final alreadyExists = existingDevices.any(
-      (d) => d.name.toLowerCase() == name.toLowerCase() || d.ip == ip,
-    );
-
-    if (!mounted) return;
-
-    if (alreadyExists) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Device with same name or IP already exists!'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
-
     final device = LedDevice(
       name: name,
       ip: ip,
@@ -64,17 +44,11 @@ class _AddDeviceState extends State<AddDevice> {
       type: _selectedDeviceType,
       port: int.parse(_portController.text),
     );
-    await widget.visualizerProvider.deviceActions([device], DeviceAction.add);
+    final resp = await widget.visualizerProvider.deviceActions(context, [
+      device,
+    ], DeviceAction.add);
 
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Device added successfully!'),
-        backgroundColor: Colors.green,
-      ),
-    );
-
+    if (!resp) return;
     // Clear all fields except port and device type
     setState(() {
       _nameController.clear();
@@ -178,7 +152,7 @@ class _AddDeviceState extends State<AddDevice> {
                     enabled: false,
                     decoration: InputDecoration(
                       labelText: 'PORT',
-                      hintText: '21324',
+                      hintText: _portController.text,
                       prefixIcon: const Icon(Icons.settings_ethernet),
                       border: OutlineInputBorder(
                         borderSide: const BorderSide(),

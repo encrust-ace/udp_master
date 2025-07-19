@@ -72,6 +72,18 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
             children: [
               ElevatedButton(
                 onPressed: () {
+                  _visualizerProvider.importDevicesFromJsonFile(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: Text("Import Devices"),
+              ),
+              ElevatedButton(
+                onPressed: () {
                   _visualizerProvider.exportDevicesToJsonFile(context);
                 },
                 style: ElevatedButton.styleFrom(
