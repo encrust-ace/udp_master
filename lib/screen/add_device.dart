@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:udp_master/device.dart';
+import 'package:udp_master/models.dart';
 import 'package:udp_master/visualizer_provider.dart';
 
 class AddDevice extends StatefulWidget {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:udp_master/device.dart';
+import 'package:udp_master/models.dart';
 import 'package:udp_master/visualizer_provider.dart';
 import 'package:udp_master/led_effects.dart';
 
