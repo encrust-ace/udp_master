@@ -18,7 +18,7 @@ class _AddDeviceState extends State<AddDevice> {
   final TextEditingController _numberOfLEDs = TextEditingController();
   final TextEditingController _ipController = TextEditingController();
   final TextEditingController _portController = TextEditingController(
-    text: '5568',
+    text: '21324',
   );
   DeviceType _selectedDeviceType = DeviceType.strip;
   final _formKey = GlobalKey<FormState>();
@@ -149,7 +149,7 @@ class _AddDeviceState extends State<AddDevice> {
                   flex: 2,
                   child: TextFormField(
                     controller: _portController,
-                    enabled: false,
+                    enabled: true,
                     decoration: InputDecoration(
                       labelText: 'PORT',
                       hintText: _portController.text,
