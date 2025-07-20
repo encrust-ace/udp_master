@@ -7,9 +7,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/led_effects.dart';
@@ -110,7 +110,8 @@ class VisualizerProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  final _record = AudioRecorder(); // For Linux
+  final Recorder _recorder = Recorder.instance;
+  // For Linux
 
   bool _isRunning = false;
   bool get isRunning => _isRunning;
@@ -302,26 +303,6 @@ class VisualizerProvider with ChangeNotifier {
     return status.isGranted;
   }
 
-  Future<void> _startMicPlatform() async {
-    try {
-      await _platform.invokeMethod("startMic");
-    } catch (e) {
-      if (kDebugMode) {
-        print("VisualizerService: Error starting mic via platform channel: $e");
-      }
-    }
-  }
-
-  Future<void> _stopMicPlatform() async {
-    try {
-      await _platform.invokeMethod("stopMic");
-    } catch (e) {
-      if (kDebugMode) {
-        print("VisualizerService: Error stopping mic via platform channel: $e");
-      }
-    }
-  }
-
   Future<bool> startVisualizer() async {
     if (_isRunning) return true;
 
@@ -336,45 +317,7 @@ class VisualizerProvider with ChangeNotifier {
     if (Platform.isLinux) {
       await _startMicLinux();
     } else {
-      await _startMicPlatform();
-      _micSubscription = _micStreamChannel.receiveBroadcastStream().listen(
-        (samples) {
-          if (!_isRunning || _devices.isEmpty) return; // Guard clause
-
-          // Ensure samples is List<double>
-          List<double> doubleSamples;
-          if (samples is List<dynamic>) {
-            doubleSamples = samples.map((s) => (s as num).toDouble()).toList();
-          } else {
-            if (kDebugMode) {
-              print(
-                "VisualizerService: Received unexpected sample type: ${samples.runtimeType}",
-              );
-            }
-            return;
-          }
-
-          double volume = calculateVolume(doubleSamples);
-          sendUdpPacketsToDevices(
-            _devices.where((d) => d.isEnabled).toList(),
-            volume,
-          );
-        },
-        onError: (error) {
-          if (kDebugMode) {
-            print("VisualizerService: Error on mic stream: $error");
-          }
-          stopVisualizer();
-        },
-        onDone: () {
-          if (kDebugMode) {
-            print("VisualizerService: Mic stream done.");
-          }
-          if (_isRunning) {
-            stopVisualizer();
-          }
-        },
-      );
+      _startMicAndroid();
     }
 
     _isRunning = true;
@@ -382,15 +325,16 @@ class VisualizerProvider with ChangeNotifier {
     return true;
   }
 
-  Future<void> stopVisualizer() async {
+  Future<void> _stopVisualizer() async {
     if (!_isRunning && _micSubscription == null) return;
 
     if (Platform.isLinux) {
-      await _record.stop();
+      _recorder.stopStreamingData();
+      _recorder.deinit();
     } else {
       await _micSubscription?.cancel();
       _micSubscription = null;
-      await _stopMicPlatform();
+      await _platform.invokeMethod("stopMic");
     }
 
     _isRunning = false;
@@ -399,45 +343,80 @@ class VisualizerProvider with ChangeNotifier {
 
   Future<void> toggleVisualizer() async {
     if (_isRunning) {
-      await stopVisualizer();
+      await _stopVisualizer();
     } else {
       await startVisualizer();
     }
   }
 
-  Future<void> _startMicLinux() async {
-    if (!(await _record.hasPermission())) {
-      if (kDebugMode) print("VisualizerService (Linux): No mic permission.");
-      return;
-    }
+  Future<void> _startMicAndroid() async {
+    await _platform.invokeMethod("startMic");
+    _micSubscription = _micStreamChannel.receiveBroadcastStream().listen(
+      (samples) {
+        if (!_isRunning || _devices.isEmpty) return; // Guard clause
 
-    await _record
-        .startStream(
-          const RecordConfig(
-            encoder: AudioEncoder.pcm16bits,
-            sampleRate: 44100,
-            numChannels: 1,
-          ),
-        )
-        .then((stream) {
-          _micSubscription = stream.listen((data) {
-            if (!_isRunning || _devices.isEmpty) return;
-
-            final int sampleCount = data.length ~/ 2;
-            List<double> samples = List.generate(sampleCount, (i) {
-              int lsb = data[2 * i];
-              int msb = data[2 * i + 1];
-              int sample = (msb << 8) | lsb;
-              if (sample & 0x8000 != 0) sample -= 0x10000;
-              return sample / 32768.0;
-            });
-
-            double volume = calculateVolume(samples);
-            sendUdpPacketsToDevices(
-              _devices.where((d) => d.isEnabled).toList(),
-              volume,
+        // Ensure samples is List<double>
+        List<double> doubleSamples;
+        if (samples is List<dynamic>) {
+          doubleSamples = samples.map((s) => (s as num).toDouble()).toList();
+        } else {
+          if (kDebugMode) {
+            print(
+              "VisualizerService: Received unexpected sample type: ${samples.runtimeType}",
             );
-          });
-        });
+          }
+          return;
+        }
+
+        double volume = calculateVolume(doubleSamples);
+        sendUdpPacketsToDevices(
+          _devices.where((d) => d.isEnabled).toList(),
+          volume,
+        );
+      },
+      onError: (error) {
+        if (kDebugMode) {
+          print("VisualizerService: Error on mic stream: $error");
+        }
+        _stopVisualizer();
+      },
+      onDone: () {
+        if (kDebugMode) {
+          print("VisualizerService: Mic stream done.");
+        }
+        if (_isRunning) {
+          _stopVisualizer();
+        }
+      },
+    );
+  }
+
+  Future<void> _startMicLinux() async {
+    try {
+      await _recorder.init(
+        format: PCMFormat.f32le,
+        sampleRate: 22050,
+        channels: RecorderChannels.mono,
+      );
+      _recorder.start();
+      _recorder.startStreamingData();
+
+      _micSubscription = _recorder.uint8ListStream.listen((data) {
+        if (!_isRunning || _devices.isEmpty) return;
+
+        final floatSamples = data.toF32List(from: PCMFormat.f32le);
+        final List<double> samples = floatSamples.toList();
+
+        double volume = calculateVolume(samples);
+        sendUdpPacketsToDevices(
+          _devices.where((d) => d.isEnabled).toList(),
+          volume,
+        );
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print("VisualizerService (Linux): Error starting mic: $e");
+      }
+    }
   }
 }
