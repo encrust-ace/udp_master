@@ -1,7 +1,6 @@
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -14,14 +13,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/led_effects.dart';
 
-double calculateVolume(List<double> samples) {
-  if (samples.isEmpty) return 0;
+double calculateNormalizedEnergy(Float32List fftData) {
   double sum = 0;
-  for (var sample in samples) {
-    sum += sample * sample;
+  for (double f in fftData) {
+    sum += f.abs();
   }
-  return sqrt(sum / samples.length); // use sqrt() from dart:math
+
+  // Dynamic range normalization (manual gain simulation)
+  double average = sum / fftData.length;
+
+  // Apply gain factor manually — tweak this
+  const double gain = 2.5;
+  return (average * gain).clamp(0.0, 1.0);
 }
+
 
 RawDatagramSocket? _socket;
 
@@ -65,7 +70,7 @@ Future<void> sendUdpPacketsToDevices(
     List<int> packetData = effect.renderFunction(
       ledCount: device.ledCount,
       volume: volume,
-      hue: currentHue
+      hue: currentHue,
     );
 
     if (packetData.isNotEmpty && packetData[0] != 0x00) {
@@ -363,11 +368,11 @@ class VisualizerProvider with ChangeNotifier {
           return;
         }
 
-        double volume = calculateVolume(doubleSamples);
-        sendUdpPacketsToDevices(
-          _devices.where((d) => d.isEnabled).toList(),
-          volume,
-        );
+        // double volume = calculateEnergyFromFFT(doubleSamples);
+        // sendUdpPacketsToDevices(
+        //   _devices.where((d) => d.isEnabled).toList(),
+        //   volume,
+        // );
       },
       onError: (error) {
         if (kDebugMode) {
@@ -386,32 +391,39 @@ class VisualizerProvider with ChangeNotifier {
     );
   }
 
-  Future<void> _startMicLinux() async {
-    try {
-      await _recorder.init(
-        format: PCMFormat.f32le,
-        sampleRate: 22050,
-        channels: RecorderChannels.mono,
+Future<void> _startMicLinux() async {
+  try {
+    await _recorder.init(
+      format: PCMFormat.f32le,
+      sampleRate: 22050,
+      channels: RecorderChannels.mono,
+    );
+    _recorder.setFftSmoothing(0.6);
+
+    // Configure gain filter
+    // _recorder.filters.autoGainFilter.targetRms.value = 0.2;
+    // _recorder.filters.autoGainFilter.activate();
+
+    _recorder.start();
+    _recorder.startStreamingData();
+
+    _micSubscription = _recorder.uint8ListStream.listen((_) {
+      if (!_isRunning || _devices.isEmpty) return;
+
+      final Float32List fft = _recorder.getFft();
+      final double volume = calculateNormalizedEnergy(fft);
+
+      sendUdpPacketsToDevices(
+        _devices.where((d) => d.isEnabled).toList(),
+        volume,
       );
-      _recorder.start();
-      _recorder.startStreamingData();
-
-      _micSubscription = _recorder.uint8ListStream.listen((data) {
-        if (!_isRunning || _devices.isEmpty) return;
-
-        final floatSamples = data.toF32List(from: PCMFormat.f32le);
-        final List<double> samples = floatSamples.toList();
-
-        double volume = calculateVolume(samples);
-        sendUdpPacketsToDevices(
-          _devices.where((d) => d.isEnabled).toList(),
-          volume,
-        );
-      });
-    } catch (e) {
-      if (kDebugMode) {
-        print("VisualizerService (Linux): Error starting mic: $e");
-      }
+    });
+  } catch (e) {
+    if (kDebugMode) {
+      print("VisualizerService (Linux): Error starting mic: $e");
     }
   }
+}
+
+
 }

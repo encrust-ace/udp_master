@@ -1,5 +1,3 @@
-const double effectSnsitivityMultiplier = 3.0;
-
 typedef EffectRenderFunction =
     List<int> Function({
       required int ledCount,
@@ -73,7 +71,7 @@ List<int> renderCenterPulsePacket({
   required double hue,
 }) {
   List<int> packet = [0x02, 0x02];
-  double reactiveVolume = (volume * effectSnsitivityMultiplier).clamp(0.0, 1.0);
+  double reactiveVolume = (volume).clamp(0.0, 1.0);
   double half = ledCount / 2;
   double spread = reactiveVolume * half;
 
@@ -96,7 +94,7 @@ List<int> renderVolumeBars({
   required double hue,
 }) {
   List<int> packet = [0x02, 0x04];
-  int active = (volume * effectSnsitivityMultiplier * ledCount).round().clamp(
+  int active = (volume * ledCount).round().clamp(
     0,
     ledCount,
   );
@@ -112,6 +110,21 @@ List<int> renderVolumeBars({
   return packet;
 }
 
+List<int> renderRainbowFlow({
+  required int ledCount,
+  required double volume,
+  required double hue,
+}) {
+  List<int> packet = [0x02, 0x05];
+  for (int i = 0; i < ledCount; i++) {
+    double offsetHue = (hue + i / ledCount) % 1.0;
+    double brightness = volume.clamp(0.2, 1.0);
+    final rgb = hsvToRgb(offsetHue, 1.0, brightness);
+    packet.addAll(rgb);
+  }
+  return packet;
+}
+
 // --- Effect List ---
 final List<LedEffect> availableEffects = [
   LedEffect(
@@ -123,6 +136,11 @@ final List<LedEffect> availableEffects = [
     id: 'center-pulse',
     name: 'Center Pulse',
     renderFunction: renderCenterPulsePacket,
+  ),
+  LedEffect(
+    id: 'rainbow-flow',
+    name: 'Rainbow Flow',
+    renderFunction: renderRainbowFlow,
   ),
 ];
 
