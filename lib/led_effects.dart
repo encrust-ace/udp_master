@@ -2,15 +2,9 @@ const double effectSnsitivityMultiplier = 3.0;
 
 typedef EffectRenderFunction =
     List<int> Function({
-      String? deviceIpKey,
       required int ledCount,
       required double volume,
       required double hue,
-      double? peakHueOffset,
-      int? peakDecayMillis,
-      double? speedMultiplier,
-      double? scrollSpeedMin,
-      double? scrollSpeedMax,
     });
 
 class LedEffect {
@@ -74,15 +68,9 @@ List<int> hsvToRgb(double h, double s, double v) {
 }
 
 List<int> renderCenterPulsePacket({
-  String? deviceIpKey,
   required int ledCount,
   required double volume,
   required double hue,
-  double? peakHueOffset,
-  int? peakDecayMillis,
-  double? speedMultiplier,
-  double? scrollSpeedMin,
-  double? scrollSpeedMax,
 }) {
   List<int> packet = [0x02, 0x02];
   double reactiveVolume = (volume * effectSnsitivityMultiplier).clamp(0.0, 1.0);
@@ -103,15 +91,9 @@ List<int> renderCenterPulsePacket({
 }
 
 List<int> renderVolumeBars({
-  String? deviceIpKey,
   required int ledCount,
   required double volume,
   required double hue,
-  double? peakHueOffset,
-  int? peakDecayMillis,
-  double? speedMultiplier,
-  double? scrollSpeedMin,
-  double? scrollSpeedMax,
 }) {
   List<int> packet = [0x02, 0x04];
   int active = (volume * effectSnsitivityMultiplier * ledCount).round().clamp(

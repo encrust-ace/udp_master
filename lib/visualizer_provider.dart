@@ -63,14 +63,9 @@ Future<void> sendUdpPacketsToDevices(
     }
 
     List<int> packetData = effect.renderFunction(
-      deviceIpKey: device.ip, // Use device.ip as the key for stateful effects
       ledCount: device.ledCount,
       volume: volume,
-      hue: currentHue,
-      // Optional parameters like peakHueOffset, peakDecayMillis, etc.,
-      // will be passed as null if not explicitly provided here.
-      // The render functions or the lambdas in availableEffects
-      // should handle their defaults.
+      hue: currentHue
     );
 
     if (packetData.isNotEmpty && packetData[0] != 0x00) {
