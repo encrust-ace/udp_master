@@ -1,4 +1,4 @@
-import 'package:udp_master/led_effects.dart'; // Ensure this import is present
+import 'package:udp_master/visualizer_provider.dart'; // Ensure this import is present
 
 enum CastMode { audio, video }
 

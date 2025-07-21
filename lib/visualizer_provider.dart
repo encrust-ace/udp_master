@@ -10,8 +10,9 @@ import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:udp_master/effects/center_pulse.dart';
+import 'package:udp_master/effects/volume_bars.dart';
 import 'package:udp_master/models.dart';
-import 'package:udp_master/led_effects.dart';
 
 double calculateNormalizedEnergy(Float32List fftData) {
   double sum = 0;
@@ -26,7 +27,6 @@ double calculateNormalizedEnergy(Float32List fftData) {
   const double gain = 2.5;
   return (average * gain).clamp(0.0, 1.0);
 }
-
 
 RawDatagramSocket? _socket;
 
@@ -90,6 +90,47 @@ void disposeSocket() {
   _socket?.close();
   _socket = null;
 }
+
+LedEffect? getEffectById(String id) {
+  try {
+    return availableEffects.firstWhere((effect) => effect.id == id);
+  } catch (_) {
+    return null;
+  }
+}
+
+typedef EffectRenderFunction =
+    List<int> Function({
+      required int ledCount,
+      required double volume,
+      required double hue,
+    });
+
+class LedEffect {
+  final String id;
+  final String name;
+  final EffectRenderFunction renderFunction;
+
+  LedEffect({
+    required this.id,
+    required this.name,
+    required this.renderFunction,
+  });
+}
+
+// --- Effect List ---
+final List<LedEffect> availableEffects = [
+  LedEffect(
+    id: 'volume-bars',
+    name: 'Volume Bars',
+    renderFunction: renderVolumeBars,
+  ),
+  LedEffect(
+    id: 'center-pulse',
+    name: 'Center Pulse',
+    renderFunction: renderCenterPulsePacket,
+  ),
+];
 
 const MethodChannel _platform = MethodChannel("mic_channel");
 const EventChannel _micStreamChannel = EventChannel('mic_stream');
@@ -391,39 +432,37 @@ class VisualizerProvider with ChangeNotifier {
     );
   }
 
-Future<void> _startMicLinux() async {
-  try {
-    await _recorder.init(
-      format: PCMFormat.f32le,
-      sampleRate: 22050,
-      channels: RecorderChannels.mono,
-    );
-    _recorder.setFftSmoothing(0.6);
-
-    // Configure gain filter
-    // _recorder.filters.autoGainFilter.targetRms.value = 0.2;
-    // _recorder.filters.autoGainFilter.activate();
-
-    _recorder.start();
-    _recorder.startStreamingData();
-
-    _micSubscription = _recorder.uint8ListStream.listen((_) {
-      if (!_isRunning || _devices.isEmpty) return;
-
-      final Float32List fft = _recorder.getFft();
-      final double volume = calculateNormalizedEnergy(fft);
-
-      sendUdpPacketsToDevices(
-        _devices.where((d) => d.isEnabled).toList(),
-        volume,
+  Future<void> _startMicLinux() async {
+    try {
+      await _recorder.init(
+        format: PCMFormat.f32le,
+        sampleRate: 22050,
+        channels: RecorderChannels.mono,
       );
-    });
-  } catch (e) {
-    if (kDebugMode) {
-      print("VisualizerService (Linux): Error starting mic: $e");
+      _recorder.setFftSmoothing(0.6);
+
+      // Configure gain filter
+      // _recorder.filters.autoGainFilter.targetRms.value = 0.2;
+      // _recorder.filters.autoGainFilter.activate();
+
+      _recorder.start();
+      _recorder.startStreamingData();
+
+      _micSubscription = _recorder.uint8ListStream.listen((_) {
+        if (!_isRunning || _devices.isEmpty) return;
+
+        final Float32List fft = _recorder.getFft();
+        final double volume = calculateNormalizedEnergy(fft);
+
+        sendUdpPacketsToDevices(
+          _devices.where((d) => d.isEnabled).toList(),
+          volume,
+        );
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print("VisualizerService (Linux): Error starting mic: $e");
+      }
     }
   }
-}
-
-
 }
