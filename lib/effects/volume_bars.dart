@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+double _prevHeight = 0.0; // persistent across frames
+
 List<int> _hsvToRgb(double h, double s, double v) {
   h = h.clamp(0.0, 1.0);
   s = s.clamp(0.0, 1.0);
@@ -45,21 +49,50 @@ List<int> _hsvToRgb(double h, double s, double v) {
   return [(r * 255).round(), (g * 255).round(), (b * 255).round()];
 }
 
-List<int> renderVolumeBars({
+List<int> renderVerticalBars({
   required int ledCount,
-  required double volume,
-  required double hue,
+  required Float32List fft,
 }) {
-  List<int> packet = [0x02, 0x04];
-  int active = (volume * ledCount).round().clamp(0, ledCount);
+  const double gain = 2.0;
+  const double brightness = 1.0;
+  const double saturation = 1.0;
+
+  const double riseSpeed = 1; // how quickly bar goes up (0.0 - 1.0)
+  const double decaySpeed = 0.5; // how quickly bar comes down (0.0 - 1.0)
+
+  if (ledCount == 0 || fft.isEmpty) {
+    return [0x02, 0x04];
+  }
+
+  final List<int> packet = [0x02, 0x04];
+
+  // Calculate energy from all frequencies
+  double sum = 0;
+  for (final value in fft) {
+    sum += value.abs();
+  }
+
+  double avg = sum / fft.length;
+  double normalized = (avg * gain).clamp(0.0, 1.0);
+
+  // Smooth transition
+  if (normalized > _prevHeight) {
+    _prevHeight += (normalized - _prevHeight) * riseSpeed;
+  } else {
+    _prevHeight += (normalized - _prevHeight) * decaySpeed;
+  }
+
+  int activeHeight = (_prevHeight * ledCount).round();
+  double hue = (1.0 - _prevHeight) * 0.7; // high intensity = red
+  final color = _hsvToRgb(hue, saturation, brightness);
 
   for (int i = 0; i < ledCount; i++) {
-    if (i < active) {
-      var rgb = _hsvToRgb(hue, 1.0, 1.0);
-      packet.addAll(rgb);
+    if (i < activeHeight) {
+      packet.addAll(color);
     } else {
       packet.addAll([0, 0, 0]);
     }
   }
+
   return packet;
 }

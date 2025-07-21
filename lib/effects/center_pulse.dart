@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 List<int> _hsvToRgb(double h, double s, double v) {
   h = h.clamp(0.0, 1.0);
   s = s.clamp(0.0, 1.0);
@@ -47,14 +49,21 @@ List<int> _hsvToRgb(double h, double s, double v) {
 
 List<int> renderCenterPulsePacket({
   required int ledCount,
-  required double volume,
-  required double hue,
+  required Float32List fft,
 }) {
   List<int> packet = [0x02, 0x02];
-  double reactiveVolume = (volume).clamp(0.0, 1.0);
-  double half = ledCount / 2;
-  double spread = reactiveVolume * half;
+  
+  const double gain = 2.0;
+  double sum = 0;
+  for (final value in fft) {
+    sum += value.abs();
+  }
 
+  double avg = sum / fft.length;
+  double normalized = (avg * gain).clamp(0.0, 1.0);
+  double half = ledCount / 2;
+  double spread = normalized * half;
+  double hue = (1.0 - spread) * 0.7; // high intensity = red
   for (int i = 0; i < ledCount; i++) {
     double dist = (i - half + 0.5).abs(); // for even counts
     if (dist < spread) {

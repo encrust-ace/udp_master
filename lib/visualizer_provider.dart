@@ -14,20 +14,6 @@ import 'package:udp_master/effects/center_pulse.dart';
 import 'package:udp_master/effects/volume_bars.dart';
 import 'package:udp_master/models.dart';
 
-double calculateNormalizedEnergy(Float32List fftData) {
-  double sum = 0;
-  for (double f in fftData) {
-    sum += f.abs();
-  }
-
-  // Dynamic range normalization (manual gain simulation)
-  double average = sum / fftData.length;
-
-  // Apply gain factor manually — tweak this
-  const double gain = 2.5;
-  return (average * gain).clamp(0.0, 1.0);
-}
-
 RawDatagramSocket? _socket;
 
 Future<void> _ensureSocketInitialized() async {
@@ -45,14 +31,12 @@ Future<void> _ensureSocketInitialized() async {
 
 Future<void> sendUdpPacketsToDevices(
   List<LedDevice> targetDevices,
-  double volume, // Assumed to be normalized 0.0 - 1.0
+  Float32List fft,
 ) async {
   await _ensureSocketInitialized();
   if (_socket == null) {
     return;
   }
-
-  double currentHue = (DateTime.now().millisecondsSinceEpoch % 36000) / 36000.0;
 
   for (var device in targetDevices) {
     if (!device.isEnabled) continue;
@@ -69,8 +53,7 @@ Future<void> sendUdpPacketsToDevices(
 
     List<int> packetData = effect.renderFunction(
       ledCount: device.ledCount,
-      volume: volume,
-      hue: currentHue,
+      fft: fft,
     );
 
     if (packetData.isNotEmpty && packetData[0] != 0x00) {
@@ -102,8 +85,8 @@ LedEffect? getEffectById(String id) {
 typedef EffectRenderFunction =
     List<int> Function({
       required int ledCount,
-      required double volume,
-      required double hue,
+      required Float32List fft,
+      // required double hue,
     });
 
 class LedEffect {
@@ -123,7 +106,7 @@ final List<LedEffect> availableEffects = [
   LedEffect(
     id: 'volume-bars',
     name: 'Volume Bars',
-    renderFunction: renderVolumeBars,
+    renderFunction: renderVerticalBars,
   ),
   LedEffect(
     id: 'center-pulse',
@@ -408,12 +391,10 @@ class VisualizerProvider with ChangeNotifier {
           }
           return;
         }
-
-        // double volume = calculateEnergyFromFFT(doubleSamples);
-        // sendUdpPacketsToDevices(
-        //   _devices.where((d) => d.isEnabled).toList(),
-        //   volume,
-        // );
+        sendUdpPacketsToDevices(
+          _devices.where((d) => d.isEnabled).toList(),
+          Float32List.fromList(doubleSamples),
+        );
       },
       onError: (error) {
         if (kDebugMode) {
@@ -452,11 +433,10 @@ class VisualizerProvider with ChangeNotifier {
         if (!_isRunning || _devices.isEmpty) return;
 
         final Float32List fft = _recorder.getFft();
-        final double volume = calculateNormalizedEnergy(fft);
 
         sendUdpPacketsToDevices(
           _devices.where((d) => d.isEnabled).toList(),
-          volume,
+          fft,
         );
       });
     } catch (e) {
