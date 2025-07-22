@@ -50,10 +50,9 @@ List<int> _hsvToRgb(double h, double s, double v) {
 List<int> renderCenterPulsePacket({
   required int ledCount,
   required Float32List fft,
+  required double gain,
 }) {
   List<int> packet = [0x02, 0x02];
-  
-  const double gain = 2.0;
   double sum = 0;
   for (final value in fft) {
     sum += value.abs();

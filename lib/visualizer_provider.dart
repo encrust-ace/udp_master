@@ -90,8 +90,6 @@ class VisualizerProvider with ChangeNotifier {
       name: 'Center Pulse',
       parameters: {
         'gain': {'min': 0.0, 'max': 5.0, 'value': 2.0},
-        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0},
-        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0},
       },
     ),
   ];
@@ -166,6 +164,7 @@ class VisualizerProvider with ChangeNotifier {
           packetData = renderCenterPulsePacket(
             ledCount: device.ledCount,
             fft: fft,
+            gain: effect.parameters["gain"]?["value"] ?? 2.0,
           );
       }
       if (packetData.isNotEmpty && packetData[0] != 0x00) {
