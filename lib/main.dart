@@ -44,7 +44,7 @@ class VisualizerScreen extends StatefulWidget {
 class _VisualizerScreenState extends State<VisualizerScreen> {
   late VisualizerProvider _visualizerProvider;
   bool _isInitialDependenciesMet = false;
-  int currentPageIndex = 1;
+  int currentPageIndex = 0;
 
   @override
   void didChangeDependencies() {
@@ -65,9 +65,7 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("UDP Master"), actions: [
-            ],
-      ),
+      appBar: AppBar(title: const Icon(Icons.lightbulb, size: 36), actions: []),
       resizeToAvoidBottomInset: true,
       bottomNavigationBar: NavigationBar(
         onDestinationSelected: (int index) {
@@ -123,7 +121,7 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
           ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.miniEndDocked,
+      floatingActionButtonLocation: FloatingActionButtonLocation.miniEndFloat,
     );
   }
 }

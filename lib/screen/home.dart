@@ -242,7 +242,7 @@ class _HomeState extends State<Home> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               SizedBox(
-                                width: 180,
+                                width: 200,
                                 height: 44,
                                 child: DropdownButtonFormField<String>(
                                   value: device.effect,
@@ -256,9 +256,7 @@ class _HomeState extends State<Home> {
                                       horizontal: 12,
                                     ),
                                   ),
-                                  items: widget
-                                      .visualizerProvider
-                                      .effects
+                                  items: widget.visualizerProvider.effects
                                       .map(
                                         (LedEffect effect) => DropdownMenuItem(
                                           value: effect.id,
@@ -277,61 +275,30 @@ class _HomeState extends State<Home> {
                                   },
                                 ),
                               ),
-                              SizedBox(
-                                width: 180,
-                                height: 44,
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    backgroundColor: device.isEnabled
-                                        ? Theme.of(context).colorScheme.primary
-                                        : Theme.of(
-                                            context,
-                                          ).colorScheme.surfaceContainerHighest,
-                                    foregroundColor: device.isEnabled
-                                        ? Theme.of(
-                                            context,
-                                          ).colorScheme.onPrimary
-                                        : Theme.of(
-                                            context,
-                                          ).colorScheme.onSurfaceVariant,
-                                    elevation: 0,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
+                              Row(
+                                spacing: 16,
+                                children: [
+                                  FilledButton(
+                                    onPressed: null,
+                                    child: Icon(Icons.edit_note, size: 26),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () {
+                                      widget.visualizerProvider
+                                          .deviceActions(context, [
+                                            device.copyWith(
+                                              isEnabled: !device.isEnabled,
+                                            ),
+                                          ], DeviceAction.update);
+                                    },
+                                    child: Icon(
+                                      device.isEnabled
+                                          ? Icons.pause_circle_filled
+                                          : Icons.play_circle_fill,
+                                      size: 26,
                                     ),
                                   ),
-                                  icon: Icon(
-                                    device.isEnabled
-                                        ? Icons.pause_circle_filled
-                                        : Icons.play_circle_fill,
-                                    size: 26,
-                                  ),
-                                  label: Text(
-                                    device.isEnabled ? "Enabled" : "Disabled",
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelLarge
-                                        ?.copyWith(
-                                          color: device.isEnabled
-                                              ? Theme.of(
-                                                  context,
-                                                ).colorScheme.onPrimary
-                                              : Theme.of(
-                                                  context,
-                                                ).colorScheme.onSurfaceVariant,
-                                        ),
-                                  ),
-                                  onPressed: () {
-                                    widget.visualizerProvider
-                                        .deviceActions(context, [
-                                          device.copyWith(
-                                            isEnabled: !device.isEnabled,
-                                          ),
-                                        ], DeviceAction.update);
-                                  },
-                                ),
+                                ],
                               ),
                             ],
                           ),
