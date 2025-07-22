@@ -52,11 +52,10 @@ List<int> _hsvToRgb(double h, double s, double v) {
 List<int> renderVerticalBars({
   required int ledCount,
   required Float32List fft,
+  required double gain,
+  required double brightness,
+  required double saturation,
 }) {
-  const double gain = 2.0;
-  const double brightness = 1.0;
-  const double saturation = 1.0;
-
   const double riseSpeed = 1; // how quickly bar goes up (0.0 - 1.0)
   const double decaySpeed = 0.5; // how quickly bar comes down (0.0 - 1.0)
 

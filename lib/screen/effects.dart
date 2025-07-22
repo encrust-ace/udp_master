@@ -16,9 +16,9 @@ class _EffectsPageState extends State<EffectsPage> {
       padding: EdgeInsets.all(16),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: widget.visualizerProvider.availableEffects.length,
+      itemCount: widget.visualizerProvider.effects.length,
       itemBuilder: (context, index) {
-        final effect = widget.visualizerProvider.availableEffects[index];
+        final effect = widget.visualizerProvider.effects[index];
         return Card(
           elevation: 4,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -28,74 +28,52 @@ class _EffectsPageState extends State<EffectsPage> {
               vertical: 18.0,
               horizontal: 18.0,
             ),
-            child: Row(
+            child: Column(
+              spacing: 4,
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Left: Device details, spaced between
-                Expanded(
-                  child: Column(
-                    spacing: 4,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        spacing: 4,
-                        children: [
-                          Icon(
-                            Icons.animation,
-                            size: 16,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          Text(
-                            effect.name,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        ],
+                Row(
+                  spacing: 4,
+                  children: [
+                    Icon(
+                      Icons.animation,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    Text(
+                      effect.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-                      Row(
-                        spacing: 4,
-                        children: [
-                          Icon(
-                            Icons.lan,
-                            size: 16,
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                          Text(
-                            effect.id,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.outline,
-                                ),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        spacing: 4,
-                        children: [
-                          Icon(
-                            Icons.linear_scale,
-                            size: 16,
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                        ],
-                      ),
-                      Row(
-                        spacing: 4,
-                        children: [
-                          Icon(
-                            Icons.category,
-                            size: 16,
-                            color: Theme.of(context).colorScheme.outline,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-
-                // Right: Effect selector and enable/disable button, both rectangular and aligned
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: effect.parameters.length,
+                  itemBuilder: (context, index) {
+                    final parameter = effect.parameters.entries.elementAt(
+                      index,
+                    );
+                    final key = parameter.key;
+                    final value = parameter.value;
+                    return Slider(
+                      label: key,
+                      value: value["value"],
+                      min: value["min"],
+                      max: value["max"],
+                      onChanged: (val) {
+                        widget.visualizerProvider.updateEffect(effect, key, {
+                          "min": value["min"],
+                          "max": value["max"],
+                          "value": val,
+                        });
+                      },
+                    );
+                  },
+                ),
               ],
             ),
           ),

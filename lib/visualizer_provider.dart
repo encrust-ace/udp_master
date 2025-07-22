@@ -38,20 +38,9 @@ typedef EffectRenderFunction =
     List<int> Function({
       required int ledCount,
       required Float32List fft,
+      double gain,
       // required double hue,
     });
-
-class LedEffect {
-  final String id;
-  final String name;
-  final EffectRenderFunction renderFunction;
-
-  LedEffect({
-    required this.id,
-    required this.name,
-    required this.renderFunction,
-  });
-}
 
 const MethodChannel _platform = MethodChannel("mic_channel");
 const EventChannel _micStreamChannel = EventChannel('mic_stream');
@@ -86,25 +75,58 @@ class VisualizerProvider with ChangeNotifier {
   // --- Effect Management ---
 
   // --- Effect List ---
-  final List<LedEffect> availableEffects = [
+  List<LedEffect> _effects = [
     LedEffect(
       id: 'volume-bars',
       name: 'Volume Bars',
-      renderFunction: renderVerticalBars,
+      parameters: {
+        'gain': {'min': 0.0, 'max': 5.0, 'value': 2.0},
+        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0},
+        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0},
+      },
     ),
     LedEffect(
       id: 'center-pulse',
       name: 'Center Pulse',
-      renderFunction: renderCenterPulsePacket,
+      parameters: {
+        'gain': {'min': 0.0, 'max': 5.0, 'value': 2.0},
+        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0},
+        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0},
+      },
     ),
   ];
 
+  UnmodifiableListView<LedEffect> get effects => UnmodifiableListView(_effects);
+
   LedEffect? getEffectById(String id) {
     try {
-      return availableEffects.firstWhere((effect) => effect.id == id);
+      return _effects.firstWhere((effect) => effect.id == id);
     } catch (_) {
       return null;
     }
+  }
+
+  Future<bool> updateEffect(
+    LedEffect effect,
+    String key,
+    Map<String, dynamic> parameter,
+  ) async {
+    List<LedEffect> existingEffects = _effects;
+    int index = existingEffects.indexWhere((e) => e.id == effect.id);
+    if (index == -1) {
+      return false;
+    }
+    existingEffects[index] = effect.copyWith(
+      parameters: {...effect.parameters, key: parameter},
+    );
+    final prefs = await SharedPreferences.getInstance();
+    final effectList = existingEffects
+        .map((e) => json.encode(e.toJson()))
+        .toList();
+    await prefs.setStringList('effects', effectList);
+    notifyListeners();
+    _effects = existingEffects;
+    return true;
   }
 
   Future<void> sendUdpPacketsToDevices(
@@ -122,18 +144,30 @@ class VisualizerProvider with ChangeNotifier {
       LedEffect? effect = getEffectById(device.effect);
 
       if (effect == null) {
-        if (availableEffects.isNotEmpty) {
-          effect = availableEffects.first;
+        if (_effects.isNotEmpty) {
+          effect = _effects.first;
         } else {
           continue;
         }
       }
 
-      List<int> packetData = effect.renderFunction(
-        ledCount: device.ledCount,
-        fft: fft,
-      );
-
+      late List<int> packetData;
+      switch (effect.id) {
+        case 'volume-bars':
+          packetData = renderVerticalBars(
+            ledCount: device.ledCount,
+            fft: fft,
+            gain: effect.parameters["gain"]?["value"] ?? 2.0,
+            brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+            saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+          );
+          break;
+        case 'center-pulse':
+          packetData = renderCenterPulsePacket(
+            ledCount: device.ledCount,
+            fft: fft,
+          );
+      }
       if (packetData.isNotEmpty && packetData[0] != 0x00) {
         try {
           _socket?.send(packetData, InternetAddress(device.ip), device.port);

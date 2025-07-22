@@ -44,7 +44,7 @@ class VisualizerScreen extends StatefulWidget {
 class _VisualizerScreenState extends State<VisualizerScreen> {
   late VisualizerProvider _visualizerProvider;
   bool _isInitialDependenciesMet = false;
-  int currentPageIndex = 0;
+  int currentPageIndex = 1;
 
   @override
   void didChangeDependencies() {

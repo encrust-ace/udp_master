@@ -17,7 +17,7 @@ class _HomeState extends State<Home> {
 
   @override
   void initState() {
-    _selectedGlobalEffect = widget.visualizerProvider.availableEffects.first;
+    _selectedGlobalEffect = widget.visualizerProvider.effects.first;
     super.initState();
   }
 
@@ -52,7 +52,7 @@ class _HomeState extends State<Home> {
                 prefixIcon: Icon(Icons.filter_vintage_outlined),
               ),
               value: _selectedGlobalEffect.id,
-              items: widget.visualizerProvider.availableEffects
+              items: widget.visualizerProvider.effects
                   .map(
                     (LedEffect effect) => DropdownMenuItem(
                       value: effect.id,
@@ -258,7 +258,7 @@ class _HomeState extends State<Home> {
                                   ),
                                   items: widget
                                       .visualizerProvider
-                                      .availableEffects
+                                      .effects
                                       .map(
                                         (LedEffect effect) => DropdownMenuItem(
                                           value: effect.id,

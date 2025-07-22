@@ -45,7 +45,6 @@ class LedDevice {
     String? effect,
     bool? isEnabled,
   }) {
-
     return LedDevice(
       name: name ?? this.name,
       ip: ip ?? this.ip,
@@ -79,6 +78,40 @@ class LedDevice {
         (e) => e.name == (json['type'] ?? DeviceType.strip.name),
         orElse: () => DeviceType.strip,
       ),
+    );
+  }
+}
+
+class LedEffect {
+  final String id;
+  final String name;
+  final Map<String, Map<String, dynamic>> parameters;
+
+  LedEffect({required this.id, required this.name, required this.parameters});
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'parameters': parameters,
+  };
+
+  factory LedEffect.fromJson(Map<String, dynamic> json) {
+    return LedEffect(
+      id: json['id'],
+      name: json['name'],
+      parameters: json['parameters'],
+    );
+  }
+
+  LedEffect copyWith({
+    String? id,
+    String? name,
+    Map<String, Map<String, dynamic>>? parameters,
+  }) {
+    return LedEffect(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      parameters: parameters ?? this.parameters,
     );
   }
 }
