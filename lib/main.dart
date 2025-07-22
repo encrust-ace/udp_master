@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:udp_master/screen/add_device.dart';
+import 'package:udp_master/screen/effects.dart';
 import 'package:udp_master/screen/home.dart';
 import 'package:flutter/services.dart';
 
@@ -64,57 +65,8 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("UDP Master"),
-        actions: [
-          Row(
-            spacing: 16,
-            children: [
-              ElevatedButton(
-                onPressed: () {
-                  _visualizerProvider.importDevicesFromJsonFile(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-                child: Text("Import Devices"),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  _visualizerProvider.exportDevicesToJsonFile(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-                child: Text("Export Devices"),
-              ),
-              SizedBox(width: 8),
-              // Text(
-              //   _visualizerProvider.castMode == CastMode.video
-              //       ? "Video"
-              //       : "Audio",
-              // ),
-              // Switch(
-              //   padding: EdgeInsets.only(right: 50),
-              //   value: _visualizerProvider.castMode == CastMode.video,
-              //   thumbColor: const WidgetStatePropertyAll<Color>(Colors.black),
-              //   onChanged: (bool value) {
-              //     if (value) {
-              //       _visualizerProvider.castMode = CastMode.video;
-              //     } else {
-              //       _visualizerProvider.castMode = CastMode.audio;
-              //     }
-              //   },
-              // ),
+      appBar: AppBar(title: const Text("UDP Master"), actions: [
             ],
-          ),
-        ],
       ),
       resizeToAvoidBottomInset: true,
       bottomNavigationBar: NavigationBar(
@@ -131,6 +83,11 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
             label: "Home",
           ),
           NavigationDestination(
+            selectedIcon: Icon(Icons.animation),
+            icon: Icon(Icons.animation_outlined),
+            label: "Effects",
+          ),
+          NavigationDestination(
             selectedIcon: Icon(Icons.add),
             icon: Icon(Icons.add_outlined),
             label: "New Device",
@@ -139,6 +96,7 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
       ),
       body: [
         Home(visualizerProvider: _visualizerProvider),
+        EffectsPage(visualizerProvider: _visualizerProvider),
         AddDevice(visualizerProvider: _visualizerProvider),
       ][currentPageIndex],
       floatingActionButton: FloatingActionButton(
@@ -165,7 +123,7 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
           ),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButtonLocation: FloatingActionButtonLocation.miniEndDocked,
     );
   }
 }

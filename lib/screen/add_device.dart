@@ -72,6 +72,56 @@ class _AddDeviceState extends State<AddDevice> {
               CrossAxisAlignment.stretch, // Make children take full width
           children: [
             Row(
+              spacing: 16,
+              children: [
+                ElevatedButton(
+                  onPressed: () {
+                    widget.visualizerProvider.importDevicesFromJsonFile(
+                      context,
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  child: Text("Import Devices"),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    widget.visualizerProvider.exportDevicesToJsonFile(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  child: Text("Export Devices"),
+                ),
+                SizedBox(width: 8),
+                // Text(
+                //   _visualizerProvider.castMode == CastMode.video
+                //       ? "Video"
+                //       : "Audio",
+                // ),
+                // Switch(
+                //   padding: EdgeInsets.only(right: 50),
+                //   value: _visualizerProvider.castMode == CastMode.video,
+                //   thumbColor: const WidgetStatePropertyAll<Color>(Colors.black),
+                //   onChanged: (bool value) {
+                //     if (value) {
+                //       _visualizerProvider.castMode = CastMode.video;
+                //     } else {
+                //       _visualizerProvider.castMode = CastMode.audio;
+                //     }
+                //   },
+                // ),
+              ],
+            ),
+
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               spacing: 8.0,
               children: [

@@ -1,5 +1,3 @@
-import 'package:udp_master/visualizer_provider.dart'; // Ensure this import is present
-
 enum CastMode { audio, video }
 
 enum DeviceAction { add, update, delete }
@@ -47,19 +45,6 @@ class LedDevice {
     String? effect,
     bool? isEnabled,
   }) {
-    String validatedEffectId = effect ?? this.effect;
-
-    if (effect != null && availableEffects.isNotEmpty) {
-      bool isNewEffectValid = availableEffects.any((e) => e.id == effect);
-      if (!isNewEffectValid) {
-        validatedEffectId =
-            availableEffects.first.id; // Fallback for new effect
-      }
-    } else if (effect != null && availableEffects.isEmpty) {
-      // If effects list is empty, we can't validate; keep what was passed or old.
-      // Or assign a placeholder if that's preferable.
-      validatedEffectId = effect; // Or consider a placeholder like "no-effects"
-    }
 
     return LedDevice(
       name: name ?? this.name,
@@ -67,7 +52,7 @@ class LedDevice {
       port: port ?? this.port,
       ledCount: ledCount ?? this.ledCount,
       type: type ?? this.type,
-      effect: validatedEffectId, // Use validated or original
+      effect: effect ?? this.effect,
       isEnabled: isEnabled ?? this.isEnabled,
     );
   }
@@ -83,27 +68,13 @@ class LedDevice {
   };
 
   factory LedDevice.fromJson(Map<String, dynamic> json) {
-    String loadedEffectId;
-
-    if (availableEffects.isNotEmpty) {
-      loadedEffectId = json['effect'] ?? availableEffects.first.id;
-      bool isValidEffect = availableEffects.any((e) => e.id == loadedEffectId);
-      if (!isValidEffect) {
-        loadedEffectId = availableEffects.first.id; // Fallback
-      }
-    } else {
-      // No effects available to validate against or fallback to.
-      // Use the effect from JSON if present, otherwise a placeholder.
-      loadedEffectId = json['effect'] ?? 'no-effects-available';
-    }
-
     return LedDevice(
-      name: json['name'] ?? 'Unknown Device',
-      ip: json['ip'] ?? '0.0.0.0',
+      name: json['name'],
+      ip: json['ip'],
       port: json['port'],
-      ledCount: json['ledCount'] ?? 0,
-      effect: loadedEffectId, // Use the validated/fallback ID
-      isEnabled: json['isEnabled'] ?? true,
+      ledCount: json['ledCount'],
+      effect: json['effect'],
+      isEnabled: json['isEnabled'],
       type: DeviceType.values.firstWhere(
         (e) => e.name == (json['type'] ?? DeviceType.strip.name),
         orElse: () => DeviceType.strip,

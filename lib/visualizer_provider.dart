@@ -29,57 +29,9 @@ Future<void> _ensureSocketInitialized() async {
   }
 }
 
-Future<void> sendUdpPacketsToDevices(
-  List<LedDevice> targetDevices,
-  Float32List fft,
-) async {
-  await _ensureSocketInitialized();
-  if (_socket == null) {
-    return;
-  }
-
-  for (var device in targetDevices) {
-    if (!device.isEnabled) continue;
-
-    LedEffect? effect = getEffectById(device.effect);
-
-    if (effect == null) {
-      if (availableEffects.isNotEmpty) {
-        effect = availableEffects.first;
-      } else {
-        continue;
-      }
-    }
-
-    List<int> packetData = effect.renderFunction(
-      ledCount: device.ledCount,
-      fft: fft,
-    );
-
-    if (packetData.isNotEmpty && packetData[0] != 0x00) {
-      try {
-        _socket?.send(packetData, InternetAddress(device.ip), device.port);
-      } catch (e) {
-        if (kDebugMode) {
-          // Minimal print for error
-          // print("UDP send error to ${device.ip}: $e");
-        }
-      }
-    }
-  }
-}
-
 void disposeSocket() {
   _socket?.close();
   _socket = null;
-}
-
-LedEffect? getEffectById(String id) {
-  try {
-    return availableEffects.firstWhere((effect) => effect.id == id);
-  } catch (_) {
-    return null;
-  }
 }
 
 typedef EffectRenderFunction =
@@ -100,20 +52,6 @@ class LedEffect {
     required this.renderFunction,
   });
 }
-
-// --- Effect List ---
-final List<LedEffect> availableEffects = [
-  LedEffect(
-    id: 'volume-bars',
-    name: 'Volume Bars',
-    renderFunction: renderVerticalBars,
-  ),
-  LedEffect(
-    id: 'center-pulse',
-    name: 'Center Pulse',
-    renderFunction: renderCenterPulsePacket,
-  ),
-];
 
 const MethodChannel _platform = MethodChannel("mic_channel");
 const EventChannel _micStreamChannel = EventChannel('mic_stream');
@@ -144,6 +82,70 @@ class VisualizerProvider with ChangeNotifier {
 
   List<LedDevice> _devices = [];
   UnmodifiableListView<LedDevice> get devices => UnmodifiableListView(_devices);
+
+  // --- Effect Management ---
+
+  // --- Effect List ---
+  final List<LedEffect> availableEffects = [
+    LedEffect(
+      id: 'volume-bars',
+      name: 'Volume Bars',
+      renderFunction: renderVerticalBars,
+    ),
+    LedEffect(
+      id: 'center-pulse',
+      name: 'Center Pulse',
+      renderFunction: renderCenterPulsePacket,
+    ),
+  ];
+
+  LedEffect? getEffectById(String id) {
+    try {
+      return availableEffects.firstWhere((effect) => effect.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> sendUdpPacketsToDevices(
+    List<LedDevice> targetDevices,
+    Float32List fft,
+  ) async {
+    await _ensureSocketInitialized();
+    if (_socket == null) {
+      return;
+    }
+
+    for (var device in targetDevices) {
+      if (!device.isEnabled) continue;
+
+      LedEffect? effect = getEffectById(device.effect);
+
+      if (effect == null) {
+        if (availableEffects.isNotEmpty) {
+          effect = availableEffects.first;
+        } else {
+          continue;
+        }
+      }
+
+      List<int> packetData = effect.renderFunction(
+        ledCount: device.ledCount,
+        fft: fft,
+      );
+
+      if (packetData.isNotEmpty && packetData[0] != 0x00) {
+        try {
+          _socket?.send(packetData, InternetAddress(device.ip), device.port);
+        } catch (e) {
+          if (kDebugMode) {
+            // Minimal print for error
+            // print("UDP send error to ${device.ip}: $e");
+          }
+        }
+      }
+    }
+  }
 
   // --- Device Management ---
 
