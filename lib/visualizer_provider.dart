@@ -212,7 +212,7 @@ class VisualizerProvider with ChangeNotifier {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Device with same name or IP already exists!'),
-                backgroundColor: Colors.redAccent,
+                backgroundColor: Colors.deepOrange,
               ),
             );
             return false;
@@ -243,8 +243,7 @@ class VisualizerProvider with ChangeNotifier {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Device ${action}ed successfully!'),
-          backgroundColor: Colors.green,
+          content: Text('Device ${action.name}ed successfully!'),
         ),
       );
     }
@@ -263,13 +262,12 @@ class VisualizerProvider with ChangeNotifier {
 
       final jsonString = jsonEncode(decodedDevices);
 
-      final directory = await getDownloadsDirectory();
-      final file = File('${directory?.path}/devices.json');
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/devices.json');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Device saved in! ${directory?.path}/devices.json'),
-            backgroundColor: Colors.green,
+            content: Text('Device saved in! ${directory.path}/devices.json'),
           ),
         );
       }
@@ -298,7 +296,7 @@ class VisualizerProvider with ChangeNotifier {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('File is incorrect!'),
-              backgroundColor: Colors.red,
+              backgroundColor: Colors.deepOrange,
             ),
           );
         }
@@ -335,7 +333,6 @@ class VisualizerProvider with ChangeNotifier {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Devices imported successfully!'),
-            backgroundColor: Colors.green,
           ),
         );
       }
