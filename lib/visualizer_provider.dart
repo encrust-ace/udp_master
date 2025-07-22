@@ -7,7 +7,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_recorder/flutter_recorder.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp_master/effects/center_pulse.dart';
@@ -242,9 +241,7 @@ class VisualizerProvider with ChangeNotifier {
     notifyListeners();
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Device ${action.name}ed successfully!'),
-        ),
+        SnackBar(content: Text('Device ${action.name}ed successfully!')),
       );
     }
     _devices = existingDevices;
@@ -257,24 +254,59 @@ class VisualizerProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final deviceList = prefs.getStringList('devices') ?? [];
 
-      // Decode each stringified device to proper Map
+      if (deviceList.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No devices to export.'),
+              backgroundColor: Colors.orangeAccent,
+            ),
+          );
+        }
+        return null;
+      }
+
       final decodedDevices = deviceList.map((e) => json.decode(e)).toList();
-
       final jsonString = jsonEncode(decodedDevices);
+      final jsonBytes = utf8.encode(jsonString);
 
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/devices.json');
+      final outputPath = await FilePicker.platform.saveFile(
+        fileName: 'devices.json',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        bytes: jsonBytes,
+      );
+
+      if (outputPath == null) {
+        return null; // User canceled
+      }
+
+      // Only needed if you're on desktop and want to write again manually
+      final file = File(outputPath);
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        await file.writeAsBytes(
+          jsonBytes,
+        ); // optional — bytes were already written
+      }
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Device saved in! ${directory.path}/devices.json'),
-          ),
+          const SnackBar(content: Text('Devices exported successfully!')),
         );
       }
-      return await file.writeAsString(jsonString);
+
+      return file;
     } catch (e) {
       if (kDebugMode) {
         print("VisualizerService: Failed to export devices to JSON: $e");
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to export devices: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
       return null;
     }
@@ -331,9 +363,7 @@ class VisualizerProvider with ChangeNotifier {
       notifyListeners();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Devices imported successfully!'),
-          ),
+          SnackBar(content: Text('Devices imported successfully!')),
         );
       }
 
