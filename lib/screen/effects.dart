@@ -34,11 +34,11 @@ class _EffectsPageState extends State<EffectsPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
-                  spacing: 4,
+                  spacing: 16,
                   children: [
                     Icon(
                       Icons.animation,
-                      size: 16,
+                      size: 28,
                       color: Theme.of(context).colorScheme.primary,
                     ),
                     Text(
@@ -59,18 +59,35 @@ class _EffectsPageState extends State<EffectsPage> {
                     );
                     final key = parameter.key;
                     final value = parameter.value;
-                    return Slider(
-                      label: key,
-                      value: value["value"],
-                      min: value["min"],
-                      max: value["max"],
-                      onChanged: (val) {
-                        widget.visualizerProvider.updateEffect(effect, key, {
-                          "min": value["min"],
-                          "max": value["max"],
-                          "value": val,
-                        });
-                      },
+                    final min = value["min"];
+                    final max = value["max"];
+                    final currentValue = value["value"];
+                    return Row(
+                      spacing: 8,
+                      children: [
+                        SizedBox(width: 100, child: Text(key)),
+                        Text(currentValue.toString()),
+                        Expanded(
+                          child: Slider(
+                            divisions: 10,
+                            value: currentValue,
+                            min: min,
+                            max: max,
+                            onChanged: (val) {
+                              widget.visualizerProvider.updateEffect(
+                                effect,
+                                key,
+                                {
+                                  "min": value["min"],
+                                  "max": value["max"],
+                                  "value": val,
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        Text(max.toString()),
+                      ],
                     );
                   },
                 ),
