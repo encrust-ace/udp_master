@@ -65,7 +65,27 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Icon(Icons.lightbulb, size: 36), actions: []),
+      appBar: AppBar(
+        title: const Icon(Icons.lightbulb, size: 36),
+        actions: [
+          IconButton(
+            onPressed: () async {
+              showDialog(
+                barrierDismissible: false,
+                useSafeArea: true,
+                context: context,
+                builder: (BuildContext context) {
+                  return Dialog(
+                    child: AddDevice(visualizerProvider: _visualizerProvider),
+                  );
+                },
+              );
+            },
+            icon: Icon(Icons.add, size: 36),
+          ),
+          SizedBox(width: 16),
+        ],
+      ),
       resizeToAvoidBottomInset: true,
       bottomNavigationBar: NavigationBar(
         onDestinationSelected: (int index) {
@@ -85,17 +105,11 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
             icon: Icon(Icons.animation_outlined),
             label: "Effects",
           ),
-          NavigationDestination(
-            selectedIcon: Icon(Icons.add),
-            icon: Icon(Icons.add_outlined),
-            label: "New Device",
-          ),
         ],
       ),
       body: [
         Home(visualizerProvider: _visualizerProvider),
         EffectsPage(visualizerProvider: _visualizerProvider),
-        AddDevice(visualizerProvider: _visualizerProvider),
       ][currentPageIndex],
       floatingActionButton: FloatingActionButton(
         onPressed: () async {

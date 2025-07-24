@@ -196,56 +196,58 @@ class VisualizerProvider with ChangeNotifier {
     List<LedDevice> devices,
     DeviceAction action,
   ) async {
-    List<LedDevice> existingDevices = await loadDevices();
-    switch (action) {
-      case DeviceAction.add:
-        for (LedDevice device in devices) {
-          // Check for duplicate (by name or IP)
-          final alreadyExists = existingDevices.any(
-            (d) =>
-                d.name.toLowerCase() == device.name.toLowerCase() ||
-                d.ip == device.ip,
-          );
-
-          if (context.mounted && alreadyExists) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Device with same name or IP already exists!'),
-                backgroundColor: Colors.deepOrange,
-              ),
+    try {
+      List<LedDevice> existingDevices = await loadDevices();
+      switch (action) {
+        case DeviceAction.add:
+          for (LedDevice device in devices) {
+            // Check for duplicate (by name or IP)
+            final int index = existingDevices.indexWhere(
+              (d) => d.ip == device.ip,
             );
-            return false;
+            if (index != -1) {
+              existingDevices[index] = device;
+              continue;
+            } else {
+              existingDevices.add(device);
+            }
           }
-          existingDevices.addAll(devices);
-        }
-        break;
-      case DeviceAction.update:
-        for (LedDevice device in devices) {
-          int index = existingDevices.indexWhere((d) => d.ip == device.ip);
-          if (index != -1) {
-            existingDevices[index] = device;
+          break;
+        case DeviceAction.update:
+          for (LedDevice device in devices) {
+            int index = existingDevices.indexWhere((d) => d.ip == device.ip);
+            if (index != -1) {
+              existingDevices[index] = device;
+            }
           }
-        }
-        break;
-      case DeviceAction.delete:
-        for (LedDevice device in devices) {
-          existingDevices.removeWhere((d) => d.ip == device.ip);
-        }
-        break;
+          break;
+        case DeviceAction.delete:
+          for (LedDevice device in devices) {
+            existingDevices.removeWhere((d) => d.ip == device.ip);
+          }
+          break;
+      }
+      final prefs = await SharedPreferences.getInstance();
+      final deviceList = existingDevices
+          .map((e) => json.encode(e.toJson()))
+          .toList();
+      await prefs.setStringList('devices', deviceList);
+      notifyListeners();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Device list updated successfully!')),
+        );
+      }
+      _devices = existingDevices;
+      return true;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+      return false;
     }
-    final prefs = await SharedPreferences.getInstance();
-    final deviceList = existingDevices
-        .map((e) => json.encode(e.toJson()))
-        .toList();
-    await prefs.setStringList('devices', deviceList);
-    notifyListeners();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Device ${action.name}ed successfully!')),
-      );
-    }
-    _devices = existingDevices;
-    return true;
   }
 
   // Export saved devices
@@ -312,71 +314,33 @@ class VisualizerProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> importDevicesFromJsonFile(BuildContext context) async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        dialogTitle: "Select Devices JSON File",
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        withData: true, // Read file content into memory
-      );
+  Future<void> importDevicesFromJsonFile(BuildContext context) async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: "Select Devices JSON File",
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      withData: true, // Read file content into memory
+    );
 
-      if (result == null ||
-          result.files.isEmpty ||
-          result.files.single.bytes == null) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('File is incorrect!'),
-              backgroundColor: Colors.deepOrange,
-            ),
-          );
-        }
-        return false;
-      }
-
-      final bytes = result.files.single.bytes!;
-      final jsonString = utf8.decode(bytes);
-      final List<dynamic> decodedList = jsonDecode(jsonString);
-
-      final List<LedDevice> devicesToAdd = [];
-      for (final device in decodedList) {
-        final alreadyExists = _devices.any(
-          (d) =>
-              d.name.toLowerCase() == device.name.toLowerCase() ||
-              d.ip == device.ip,
-        );
-        if (!alreadyExists) {
-          devicesToAdd.add(device);
-        }
-      }
-
-      devicesToAdd.addAll(_devices);
-
-      final List<String> encodedDevices = devicesToAdd
-          .map((e) => jsonEncode(e))
-          .toList();
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('devices', encodedDevices);
-      _devices = devicesToAdd;
-      notifyListeners();
+    if (result == null ||
+        result.files.isEmpty ||
+        result.files.single.bytes == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Devices imported successfully!')),
+          SnackBar(
+            content: Text('File is incorrect!'),
+            backgroundColor: Colors.deepOrange,
+          ),
         );
       }
+    } else {
+      final bytes = result.files.single.bytes!;
+      final jsonString = utf8.decode(bytes);
+      final List<dynamic> decodedList = jsonDecode(jsonString); // This is List<dynamic>
+      final List<LedDevice> importedDevices =
+          decodedList.map((e) => LedDevice.fromJson(e)).toList();
 
-      if (kDebugMode) {
-        print("Imported ${encodedDevices.length} devices successfully.");
-      }
-
-      return true;
-    } catch (e) {
-      if (kDebugMode) {
-        print("Error importing devices from file picker: $e");
-      }
-      return false;
+      deviceActions(context, importedDevices, DeviceAction.add);
     }
   }
 

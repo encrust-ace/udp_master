@@ -4,8 +4,9 @@ import 'package:udp_master/visualizer_provider.dart';
 
 class AddDevice extends StatefulWidget {
   final VisualizerProvider visualizerProvider;
+  final LedDevice? device;
 
-  const AddDevice({super.key, required this.visualizerProvider});
+  const AddDevice({super.key, required this.visualizerProvider, this.device});
 
   @override
   State<AddDevice> createState() => _AddDeviceState();
@@ -58,6 +59,20 @@ class _AddDeviceState extends State<AddDevice> {
       _selectedDeviceType = DeviceType.strip; // Reset to default
       selectedEffect = 'linear-fill'; // Optionally reset effect
     });
+    Navigator.of(context).pop();
+  }
+
+  @override
+  void initState() {
+    if (widget.device != null) {
+      _nameController.text = widget.device!.name;
+      _ipController.text = widget.device!.ip;
+      _numberOfLEDs.text = widget.device!.ledCount.toString();
+      _portController.text = widget.device!.port.toString();
+      _selectedDeviceType = widget.device!.type;
+      selectedEffect = widget.device!.effect;
+    }
+    super.initState();
   }
 
   @override
@@ -252,25 +267,55 @@ class _AddDeviceState extends State<AddDevice> {
                 ),
               ],
             ),
-            ElevatedButton(
-              onPressed: () {
-                if (_formKey.currentState?.validate() ?? false) {
-                  _addDevice();
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6.0),
-                  side: const BorderSide(),
+            SizedBox(height: 60),
+            Row(
+              spacing: 16,
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6.0),
+                        side: const BorderSide(),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 18.0,
+                        horizontal: 18.0,
+                      ),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    child: const Text("Cancel"),
+                  ),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 18.0,
-                  horizontal: 18.0,
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (_formKey.currentState?.validate() ?? false) {
+                        _addDevice();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6.0),
+                        side: const BorderSide(),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 18.0,
+                        horizontal: 18.0,
+                      ),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    child: Text(
+                      widget.device == null ? "Add Device" : "Update Device",
+                    ),
+                  ),
                 ),
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              ),
-              child: const Text("Add Device"),
+              ],
             ),
           ],
         ),

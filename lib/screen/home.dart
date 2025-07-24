@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:udp_master/models.dart';
+import 'package:udp_master/screen/add_device.dart';
 import 'package:udp_master/visualizer_provider.dart';
 
 class Home extends StatefulWidget {
@@ -279,7 +280,23 @@ class _HomeState extends State<Home> {
                                 spacing: 16,
                                 children: [
                                   FilledButton(
-                                    onPressed: null,
+                                    onPressed: () async {
+                                      showDialog(
+                                        barrierDismissible: false,
+                                        useSafeArea: true,
+                                        context: context,
+                                        builder: (BuildContext context) {
+                                          return Dialog(
+                                            child: AddDevice(
+                                              visualizerProvider:
+                                                  widget.visualizerProvider,
+                                                  device: device,
+                                            ),
+                                        
+                                          );
+                                        },
+                                      );
+                                    },
                                     child: Icon(Icons.edit_note, size: 26),
                                   ),
                                   FilledButton(
