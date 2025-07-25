@@ -9,29 +9,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:udp/udp.dart';
 import 'package:udp_master/effects/center_pulse.dart';
 import 'package:udp_master/effects/volume_bars.dart';
 import 'package:udp_master/models.dart';
-
-RawDatagramSocket? _socket;
-
-Future<void> _ensureSocketInitialized() async {
-  if (_socket == null) {
-    try {
-      _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
-    } catch (e) {
-      if (kDebugMode) {
-        // Minimal print for error
-        // print("Socket init error: $e");
-      }
-    }
-  }
-}
-
-void disposeSocket() {
-  _socket?.close();
-  _socket = null;
-}
 
 typedef EffectRenderFunction =
     List<int> Function({
@@ -126,54 +107,99 @@ class VisualizerProvider with ChangeNotifier {
     return true;
   }
 
-  Future<void> sendUdpPacketsToDevices(
-    List<LedDevice> targetDevices,
-    Float32List fft,
-  ) async {
-    await _ensureSocketInitialized();
-    if (_socket == null) {
-      return;
-    }
+  Future<void> sendUdpToDevices({
+    required List<LedDevice> targetDevices,
+    required Float32List fft,
+  }) async {
+    final udp = await UDP.bind(Endpoint.any());
 
     for (var device in targetDevices) {
       if (!device.isEnabled) continue;
 
-      LedEffect? effect = getEffectById(device.effect);
+      final target = Endpoint.unicast(
+        InternetAddress(device.ip),
+        port: Port(device.port),
+      );
 
-      if (effect == null) {
-        if (_effects.isNotEmpty) {
-          effect = _effects.first;
-        } else {
-          continue;
-        }
-      }
-
-      late List<int> packetData;
-      switch (effect.id) {
-        case 'volume-bars':
-          packetData = renderVerticalBars(
-            ledCount: device.ledCount,
-            fft: fft,
-            gain: effect.parameters["gain"]?["value"] ?? 2.0,
-            brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-            saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-          );
-          break;
-        case 'center-pulse':
-          packetData = renderCenterPulsePacket(
-            ledCount: device.ledCount,
-            fft: fft,
-            gain: effect.parameters["gain"]?["value"] ?? 2.0,
-          );
-      }
-      if (packetData.isNotEmpty && packetData[0] != 0x00) {
-        try {
-          _socket?.send(packetData, InternetAddress(device.ip), device.port);
-        } catch (e) {
-          if (kDebugMode) {
-            // Minimal print for error
-            // print("UDP send error to ${device.ip}: $e");
+      try {
+        if (device.type == DeviceType.wled) {
+          LedEffect? effect = getEffectById(device.effect) ?? _effects.first;
+          late List<int> packetData;
+          switch (effect.id) {
+            case 'volume-bars':
+              packetData = renderVerticalBars(
+                device: device,
+                fft: fft,
+                gain: effect.parameters["gain"]?["value"] ?? 2.0,
+                brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+                saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+              );
+              break;
+            case 'center-pulse':
+              packetData = renderCenterPulsePacket(
+                ledCount: device.ledCount,
+                fft: fft,
+                gain: effect.parameters["gain"]?["value"] ?? 2.0,
+              );
+              break;
+            default:
+              continue;
           }
+          if (packetData.isNotEmpty) {
+            udp.send(packetData, target);
+          }
+        } else if (device.type == DeviceType.wiz) {
+          LedEffect? effect = getEffectById(device.effect) ?? _effects.first;
+          late List<int> packetData;
+          switch (effect.id) {
+            case 'volume-bars':
+              packetData = renderVerticalBars(
+                device: device,
+                fft: fft,
+                gain: effect.parameters["gain"]?["value"] ?? 2.0,
+                brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+                saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+              );
+              break;
+            case 'center-pulse':
+              packetData = renderCenterPulsePacket(
+                ledCount: device.ledCount,
+                fft: fft,
+                gain: effect.parameters["gain"]?["value"] ?? 2.0,
+              );
+              break;
+            default:
+              continue;
+          }
+
+          final r = packetData.first > 0 ? packetData[0] : 0;
+          final g = packetData.length > 1 ? packetData[1] : 0;
+          final b = packetData.length > 2 ? packetData[2] : 0;
+          final brightness = packetData.length > 3 ? packetData[3] : 0;
+
+
+
+          //   final r = 0;
+          // final g = 0;
+          // final b = 0;
+
+          final data = {
+            "method": "setPilot",
+            "params": {
+              "state": brightness > 20,
+              "r": r.clamp(0, 255),
+              "g": g.clamp(0, 255),
+              "b": b.clamp(0, 255),
+              "dimming": brightness
+            },
+          };
+
+          final message = utf8.encode(jsonEncode(data));
+          udp.send(message, target);
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print("Error sending to ${device.ip}: $e");
         }
       }
     }
@@ -336,9 +362,12 @@ class VisualizerProvider with ChangeNotifier {
     } else {
       final bytes = result.files.single.bytes!;
       final jsonString = utf8.decode(bytes);
-      final List<dynamic> decodedList = jsonDecode(jsonString); // This is List<dynamic>
-      final List<LedDevice> importedDevices =
-          decodedList.map((e) => LedDevice.fromJson(e)).toList();
+      final List<dynamic> decodedList = jsonDecode(
+        jsonString,
+      ); // This is List<dynamic>
+      final List<LedDevice> importedDevices = decodedList
+          .map((e) => LedDevice.fromJson(e))
+          .toList();
 
       deviceActions(context, importedDevices, DeviceAction.add);
     }
@@ -417,9 +446,9 @@ class VisualizerProvider with ChangeNotifier {
           }
           return;
         }
-        sendUdpPacketsToDevices(
-          _devices.where((d) => d.isEnabled).toList(),
-          Float32List.fromList(doubleSamples),
+        sendUdpToDevices(
+          targetDevices: _devices.where((d) => d.isEnabled).toList(),
+          fft: Float32List.fromList(doubleSamples),
         );
       },
       onError: (error) {
@@ -460,9 +489,9 @@ class VisualizerProvider with ChangeNotifier {
 
         final Float32List fft = _recorder.getFft();
 
-        sendUdpPacketsToDevices(
-          _devices.where((d) => d.isEnabled).toList(),
-          fft,
+        sendUdpToDevices(
+          targetDevices: _devices.where((d) => d.isEnabled).toList(),
+          fft: fft,
         );
       });
     } catch (e) {

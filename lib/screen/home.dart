@@ -176,7 +176,7 @@ class _HomeState extends State<Home> {
                                       ).colorScheme.outline,
                                     ),
                                     Text(
-                                      device.ip,
+                                      '${device.ip}:${device.port}',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall

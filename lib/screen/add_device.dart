@@ -13,15 +13,13 @@ class AddDevice extends StatefulWidget {
 }
 
 class _AddDeviceState extends State<AddDevice> {
-  String selectedEffect = 'linear-fill';
-  final List<String> effects = ['linear-fill', 'center-pulse', 'wave-pulse'];
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _numberOfLEDs = TextEditingController();
   final TextEditingController _ipController = TextEditingController();
   final TextEditingController _portController = TextEditingController(
     text: '21324',
   );
-  DeviceType _selectedDeviceType = DeviceType.strip;
+  DeviceType _selectedDeviceType = DeviceType.wled;
   final _formKey = GlobalKey<FormState>();
 
   @override
@@ -35,12 +33,13 @@ class _AddDeviceState extends State<AddDevice> {
     final ledCount = int.tryParse(_numberOfLEDs.text.trim()) ?? 0;
     final name = _nameController.text.trim();
     final ip = _ipController.text.trim();
+    final effects = widget.visualizerProvider.effects;
 
     final device = LedDevice(
       name: name,
       ip: ip,
       ledCount: ledCount,
-      effect: selectedEffect,
+      effect: effects.first.id,
       isEnabled: true,
       type: _selectedDeviceType,
       port: int.parse(_portController.text),
@@ -56,8 +55,7 @@ class _AddDeviceState extends State<AddDevice> {
       _ipController.clear();
       _numberOfLEDs.clear();
       // _portController remains unchanged
-      _selectedDeviceType = DeviceType.strip; // Reset to default
-      selectedEffect = 'linear-fill'; // Optionally reset effect
+      _selectedDeviceType = DeviceType.wled; // Reset to default
     });
     Navigator.of(context).pop();
   }
@@ -70,7 +68,6 @@ class _AddDeviceState extends State<AddDevice> {
       _numberOfLEDs.text = widget.device!.ledCount.toString();
       _portController.text = widget.device!.port.toString();
       _selectedDeviceType = widget.device!.type;
-      selectedEffect = widget.device!.effect;
     }
     super.initState();
   }
@@ -270,49 +267,46 @@ class _AddDeviceState extends State<AddDevice> {
             SizedBox(height: 60),
             Row(
               spacing: 16,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6.0),
-                        side: const BorderSide(),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 18.0,
-                        horizontal: 18.0,
-                      ),
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6.0),
+                      side: const BorderSide(),
                     ),
-                    child: const Text("Cancel"),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 18.0,
+                      horizontal: 18.0,
+                    ),
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   ),
+                  child: const Text("Cancel"),
                 ),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState?.validate() ?? false) {
-                        _addDevice();
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6.0),
-                        side: const BorderSide(),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 18.0,
-                        horizontal: 18.0,
-                      ),
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                ElevatedButton(
+                  onPressed: () {
+                    if (_formKey.currentState?.validate() ?? false) {
+                      _addDevice();
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6.0),
+                      side: const BorderSide(),
                     ),
-                    child: Text(
-                      widget.device == null ? "Add Device" : "Update Device",
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 18.0,
+                      horizontal: 18.0,
                     ),
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                  child: Text(
+                    widget.device == null ? "Add Device" : "Update Device",
                   ),
                 ),
               ],

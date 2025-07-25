@@ -2,17 +2,19 @@ enum CastMode { audio, video }
 
 enum DeviceAction { add, update, delete }
 
-enum DeviceType { strip, single, matrix }
+enum DeviceType { wled, esphome, wiz, tuya }
 
 extension DeviceTypeExtension on DeviceType {
   String get displayName {
     switch (this) {
-      case DeviceType.strip:
-        return 'LED Strip';
-      case DeviceType.single:
-        return 'Single';
-      case DeviceType.matrix:
-        return 'LED Matrix';
+      case DeviceType.wled:
+        return 'Wled';
+      case DeviceType.esphome:
+        return 'ESP Home';
+      case DeviceType.wiz:
+        return 'Wiz';
+      case DeviceType.tuya:
+        return 'Tuya';
     }
   }
 }
@@ -22,8 +24,8 @@ class LedDevice {
   final String ip;
   final int port;
   final int ledCount;
-  String effect; // Mutable to allow fallback
-  bool isEnabled;
+  final String effect;
+  final bool isEnabled;
   final DeviceType type;
 
   LedDevice({
@@ -32,8 +34,8 @@ class LedDevice {
     required this.port,
     required this.ledCount,
     required this.effect,
-    this.isEnabled = true,
-    this.type = DeviceType.strip,
+    required this.isEnabled,
+    required this.type,
   });
 
   LedDevice copyWith({
@@ -74,10 +76,7 @@ class LedDevice {
       ledCount: json['ledCount'],
       effect: json['effect'],
       isEnabled: json['isEnabled'],
-      type: DeviceType.values.firstWhere(
-        (e) => e.name == (json['type'] ?? DeviceType.strip.name),
-        orElse: () => DeviceType.strip,
-      ),
+      type: DeviceType.values.firstWhere((e) => e.name == json['type']),
     );
   }
 }
