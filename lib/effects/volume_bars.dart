@@ -2,8 +2,6 @@ import 'dart:typed_data';
 
 import 'package:udp_master/models.dart';
 
-double _prevHeight = 0.0; // persistent across frames
-
 List<int> _hsvToRgb(double h, double s, double v) {
   h = h.clamp(0.0, 1.0);
   s = s.clamp(0.0, 1.0);
@@ -58,49 +56,33 @@ List<int> renderVerticalBars({
   required double brightness,
   required double saturation,
 }) {
-  const double riseSpeed = 1.0;
-  const double decaySpeed = 0.5;
+  final int count = device.ledCount;
+  if (count == 0 || fft.isEmpty) return [0x02, 0x04];
 
-  if (device.ledCount == 0 || fft.isEmpty) {
-    return [0x02, 0x04];
-  }
-
-  double sum = 0;
-  for (final value in fft) {
-    sum += value.abs();
-  }
-
-  double avg = sum / fft.length;
-  double normalized = (avg * gain).clamp(0.0, 1.0);
-
-  // Smooth height transition
-  if (normalized > _prevHeight) {
-    _prevHeight += (normalized - _prevHeight) * riseSpeed;
-  } else {
-    _prevHeight += (normalized - _prevHeight) * decaySpeed;
-  }
-
-  int activeHeight = (_prevHeight * device.ledCount).round();
-  double hue = (1.0 - _prevHeight) * 0.7;
-
-  if (device.type == DeviceType.wiz) {
-    // Wiz supports only 1 LED - treat it as intensity-reactive
-    final wizColor = _hsvToRgb(hue, saturation, brightness);
-    return [...wizColor, (_prevHeight * 100).round()];
-  }
-
-  // WLED: construct packet with each LED's color
-  final color = _hsvToRgb(hue, saturation, brightness);
   final List<int> packet = [0x02, 0x04];
-  for (int i = 0; i < device.ledCount; i++) {
-    if (i < activeHeight) {
-      packet.addAll(color);
+
+  // Focus only on the first 15% of the FFT (bass/rhythm)
+  int bassBinCount = (fft.length * 0.15).floor().clamp(1, fft.length);
+  double bassAvg = 0.0;
+  for (int i = 0; i < bassBinCount; i++) {
+    bassAvg += fft[i].abs();
+  }
+  bassAvg /= bassBinCount;
+
+  final double barStrength = (bassAvg * gain).clamp(0.0, 1.0);
+
+  for (int i = 0; i < count; i++) {
+    final double pos = (i + 0.5) / count;
+    final double strength = ((barStrength - pos) * count).clamp(0.0, 1.0);
+
+    if (strength > 0) {
+      final double hue = (1.0 - pos) * 0.7;
+      final fadedColor = _hsvToRgb(hue, saturation, brightness * strength);
+      packet.addAll(fadedColor);
     } else {
       packet.addAll([0, 0, 0]);
     }
   }
-
-  print(packet);
 
   return packet;
 }

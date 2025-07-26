@@ -15,6 +15,8 @@ class Home extends StatefulWidget {
 
 class _HomeState extends State<Home> {
   late LedEffect _selectedGlobalEffect;
+  final List<String> _sortOptions = ['Name', 'IP'];
+  String _selectedSortOption = 'Name';
 
   @override
   void initState() {
@@ -46,26 +48,64 @@ class _HomeState extends State<Home> {
           crossAxisAlignment:
               CrossAxisAlignment.stretch, // Make children take full width
           children: [
-            DropdownButtonFormField<String>(
-              decoration: const InputDecoration(
-                labelText: 'Select Effect',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.filter_vintage_outlined),
-              ),
-              value: _selectedGlobalEffect.id,
-              items: widget.visualizerProvider.effects
-                  .map(
-                    (LedEffect effect) => DropdownMenuItem(
-                      value: effect.id,
-                      child: Text(effect.name),
+            Row(
+              spacing: 16,
+              children: [
+                Expanded(
+                  child: ButtonTheme(
+                    alignedDropdown: true,
+                    child: DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: 'Sort By',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.sort),
+                      ),
+                      value: _selectedSortOption,
+                      items: _sortOptions
+                          .map(
+                            (String option) => DropdownMenuItem(
+                              value: option,
+                              child: Text(option),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (newOption) {
+                        if (newOption != null) {
+                          setState(() {
+                            _selectedSortOption = newOption;
+                          });
+                        }
+                      },
                     ),
-                  )
-                  .toList(),
-              onChanged: (newEffectId) {
-                if (newEffectId != null) {
-                  _applyGlobalEffect(context, newEffectId);
-                }
-              },
+                  ),
+                ),
+                Expanded(
+                  child: ButtonTheme(
+                    alignedDropdown: true,
+                    child: DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        labelText: 'Select Effect',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.filter_vintage_outlined),
+                      ),
+                      value: _selectedGlobalEffect.id,
+                      items: widget.visualizerProvider.effects
+                          .map(
+                            (LedEffect effect) => DropdownMenuItem(
+                              value: effect.id,
+                              child: Text(effect.name),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (newEffectId) {
+                        if (newEffectId != null) {
+                          _applyGlobalEffect(context, newEffectId);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
             ListView.builder(
               shrinkWrap: true,
@@ -245,35 +285,38 @@ class _HomeState extends State<Home> {
                               SizedBox(
                                 width: 200,
                                 height: 44,
-                                child: DropdownButtonFormField<String>(
-                                  value: device.effect,
-                                  decoration: InputDecoration(
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(4),
+                                child: ButtonTheme(
+                                  alignedDropdown: true,
+                                  child: DropdownButtonFormField<String>(
+                                    value: device.effect,
+                                    decoration: InputDecoration(
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                        horizontal: 12,
+                                      ),
                                     ),
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                      horizontal: 12,
-                                    ),
+                                    items: widget.visualizerProvider.effects
+                                        .map(
+                                          (LedEffect effect) => DropdownMenuItem(
+                                            value: effect.id,
+                                            child: Text(effect.name),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        widget.visualizerProvider.deviceActions(
+                                          context,
+                                          [device.copyWith(effect: val)],
+                                          DeviceAction.update,
+                                        );
+                                      }
+                                    },
                                   ),
-                                  items: widget.visualizerProvider.effects
-                                      .map(
-                                        (LedEffect effect) => DropdownMenuItem(
-                                          value: effect.id,
-                                          child: Text(effect.name),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (val) {
-                                    if (val != null) {
-                                      widget.visualizerProvider.deviceActions(
-                                        context,
-                                        [device.copyWith(effect: val)],
-                                        DeviceAction.update,
-                                      );
-                                    }
-                                  },
                                 ),
                               ),
                               Row(
@@ -290,9 +333,8 @@ class _HomeState extends State<Home> {
                                             child: AddDevice(
                                               visualizerProvider:
                                                   widget.visualizerProvider,
-                                                  device: device,
+                                              device: device,
                                             ),
-                                        
                                           );
                                         },
                                       );

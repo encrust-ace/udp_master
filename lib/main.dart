@@ -4,6 +4,7 @@ import 'package:udp_master/screen/add_device.dart';
 import 'package:udp_master/screen/effects.dart';
 import 'package:udp_master/screen/home.dart';
 import 'package:flutter/services.dart';
+import 'package:udp_master/screen/simulator_page.dart';
 
 import 'visualizer_provider.dart';
 
@@ -44,7 +45,7 @@ class VisualizerScreen extends StatefulWidget {
 class _VisualizerScreenState extends State<VisualizerScreen> {
   late VisualizerProvider _visualizerProvider;
   bool _isInitialDependenciesMet = false;
-  int currentPageIndex = 0;
+  int currentPageIndex = 2;
 
   @override
   void didChangeDependencies() {
@@ -105,11 +106,17 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
             icon: Icon(Icons.animation_outlined),
             label: "Effects",
           ),
+          NavigationDestination(
+            selectedIcon: Icon(Icons.strikethrough_s_sharp),
+            icon: Icon(Icons.strikethrough_s_sharp),
+            label: "Simulator",
+          ),
         ],
       ),
       body: [
         Home(visualizerProvider: _visualizerProvider),
         EffectsPage(visualizerProvider: _visualizerProvider),
+        SimulatorPaage(visualizerProvider: _visualizerProvider,)
       ][currentPageIndex],
       floatingActionButton: FloatingActionButton(
         onPressed: () async {

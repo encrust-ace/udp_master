@@ -11,6 +11,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp/udp.dart';
 import 'package:udp_master/effects/center_pulse.dart';
+import 'package:udp_master/effects/music_rhythm.dart';
+import 'package:udp_master/effects/rail_track.dart';
+import 'package:udp_master/effects/test2.dart';
 import 'package:udp_master/effects/volume_bars.dart';
 import 'package:udp_master/models.dart';
 
@@ -46,6 +49,7 @@ class VisualizerProvider with ChangeNotifier {
 
   bool _isRunning = false;
   bool get isRunning => _isRunning;
+  List<int> packets = [];
 
   StreamSubscription? _micSubscription;
 
@@ -70,6 +74,27 @@ class VisualizerProvider with ChangeNotifier {
       name: 'Center Pulse',
       parameters: {
         'gain': {'min': 0.0, 'max': 5.0, 'value': 2.0},
+      },
+    ),
+    LedEffect(
+      id: 'music-rhythm',
+      name: 'Music Rhythm',
+      parameters: {
+        'gain': {'min': 0.0, 'max': 5.0, 'value': 2.0},
+        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0},
+        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0},
+        'raiseSpeed': {'min': 5.0, 'max': 50.0, 'value': 10.0},
+        'decaySpeed': {'min': 1.0, 'max': 10.0, 'value': 1.0},
+        'dropSpeed': {'min': 0.1, 'max': 1.0, 'value': 0.5},
+      },
+    ),
+    LedEffect(
+      id: 'rail-track',
+      name: 'Rail Track',
+      parameters: {
+        'gain': {'min': 0.0, 'max': 5.0, 'value': 2.0},
+        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0},
+        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0},
       },
     ),
   ];
@@ -142,6 +167,27 @@ class VisualizerProvider with ChangeNotifier {
                 gain: effect.parameters["gain"]?["value"] ?? 2.0,
               );
               break;
+            case 'music-rhythm':
+              packetData = renderBeatDropEffect(
+                device: device,
+                fft: fft,
+                gain: effect.parameters["gain"]?["value"] ?? 2.0,
+                brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+                saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+                raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 10.0,
+                decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 1.0,
+                dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
+              );
+              break;
+            case 'rail-track':
+              packetData = renderRailTrack(
+                device: device,
+                fft: fft,
+                gain: effect.parameters["gain"]?["value"] ?? 2.0,
+                brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+                saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+              );
+              break;
             default:
               continue;
           }
@@ -161,13 +207,6 @@ class VisualizerProvider with ChangeNotifier {
                 saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
               );
               break;
-            case 'center-pulse':
-              packetData = renderCenterPulsePacket(
-                ledCount: device.ledCount,
-                fft: fft,
-                gain: effect.parameters["gain"]?["value"] ?? 2.0,
-              );
-              break;
             default:
               continue;
           }
@@ -177,12 +216,6 @@ class VisualizerProvider with ChangeNotifier {
           final b = packetData.length > 2 ? packetData[2] : 0;
           final brightness = packetData.length > 3 ? packetData[3] : 0;
 
-
-
-          //   final r = 0;
-          // final g = 0;
-          // final b = 0;
-
           final data = {
             "method": "setPilot",
             "params": {
@@ -190,7 +223,7 @@ class VisualizerProvider with ChangeNotifier {
               "r": r.clamp(0, 255),
               "g": g.clamp(0, 255),
               "b": b.clamp(0, 255),
-              "dimming": brightness
+              "dimming": brightness,
             },
           };
 
@@ -203,6 +236,26 @@ class VisualizerProvider with ChangeNotifier {
         }
       }
     }
+    // For simulators
+    final device = LedDevice(
+      name: "Simulator",
+      ip: "127.0.0.1",
+      port: 12345,
+      ledCount: 50,
+      effect: "volume-bars",
+      isEnabled: true,
+      type: DeviceType.esphome,
+    );
+    late List<int> packetData;
+    packetData = renderBeatDropEffectTest(
+      device: device,
+      fft: fft,
+      gain: 1,
+      brightness: 1,
+      saturation: 1,
+    );
+    packets = packetData;
+    notifyListeners();
   }
 
   // --- Device Management ---
@@ -472,14 +525,10 @@ class VisualizerProvider with ChangeNotifier {
     try {
       await _recorder.init(
         format: PCMFormat.f32le,
-        sampleRate: 22050,
+        sampleRate: 44100,
         channels: RecorderChannels.mono,
       );
-      _recorder.setFftSmoothing(0.6);
-
-      // Configure gain filter
-      // _recorder.filters.autoGainFilter.targetRms.value = 0.2;
-      // _recorder.filters.autoGainFilter.activate();
+      _recorder.setFftSmoothing(0.1);
 
       _recorder.start();
       _recorder.startStreamingData();
