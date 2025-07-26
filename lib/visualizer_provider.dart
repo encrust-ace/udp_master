@@ -12,7 +12,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp/udp.dart';
 import 'package:udp_master/effects/center_pulse.dart';
 import 'package:udp_master/effects/music_rhythm.dart';
-import 'package:udp_master/effects/rail_track.dart';
 import 'package:udp_master/effects/test2.dart';
 import 'package:udp_master/effects/volume_bars.dart';
 import 'package:udp_master/models.dart';
@@ -86,15 +85,6 @@ class VisualizerProvider with ChangeNotifier {
         'raiseSpeed': {'min': 5.0, 'max': 50.0, 'value': 10.0},
         'decaySpeed': {'min': 1.0, 'max': 10.0, 'value': 1.0},
         'dropSpeed': {'min': 0.1, 'max': 1.0, 'value': 0.5},
-      },
-    ),
-    LedEffect(
-      id: 'rail-track',
-      name: 'Rail Track',
-      parameters: {
-        'gain': {'min': 0.0, 'max': 5.0, 'value': 2.0},
-        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0},
-        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0},
       },
     ),
   ];
@@ -177,15 +167,6 @@ class VisualizerProvider with ChangeNotifier {
                 raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 10.0,
                 decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 1.0,
                 dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
-              );
-              break;
-            case 'rail-track':
-              packetData = renderRailTrack(
-                device: device,
-                fft: fft,
-                gain: effect.parameters["gain"]?["value"] ?? 2.0,
-                brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-                saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
               );
               break;
             default:
