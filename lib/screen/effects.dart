@@ -82,6 +82,7 @@ class _EffectsPageState extends State<EffectsPage> {
                                       "min": value["min"],
                                       "max": value["max"],
                                       "value": val,
+                                      "steps": value["steps"],
                                     });
                               },
                             ),

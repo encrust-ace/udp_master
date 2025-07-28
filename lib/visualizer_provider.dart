@@ -71,7 +71,7 @@ class VisualizerProvider with ChangeNotifier {
       id: 'volume-bars',
       name: 'Volume Bars',
       parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 9},
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
         'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
         'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
       },
@@ -80,19 +80,19 @@ class VisualizerProvider with ChangeNotifier {
       id: 'center-pulse',
       name: 'Center Pulse',
       parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 9},
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
       },
     ),
     LedEffect(
       id: 'music-rhythm',
       name: 'Music Rhythm',
       parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 9},
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
         'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
         'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
         'raiseSpeed': {'min': 5.0, 'max': 30.0, 'value': 10.0, 'steps': 10},
-        'decaySpeed': {'min': 0.3, 'max': 2.0, 'value': 0.4, 'steps': 17},
-        'dropSpeed': {'min': 0.1, 'max': 1.0, 'value': 0.5, 'steps': 10},
+        'decaySpeed': {'min': 0.3, 'max': 1.0, 'value': 0.4, 'steps': 7},
+        'dropSpeed': {'min': 0.1, 'max': 1.0, 'value': 0.5, 'steps': 9},
       },
     ),
   ];
