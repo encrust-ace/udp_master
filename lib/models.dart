@@ -2,15 +2,15 @@ enum CastMode { audio, video }
 
 enum DeviceAction { add, update, delete }
 
-enum DeviceType { wled, esphome, wiz, tuya }
+enum DeviceType { wled, udp, wiz, tuya }
 
 extension DeviceTypeExtension on DeviceType {
   String get displayName {
     switch (this) {
       case DeviceType.wled:
         return 'Wled';
-      case DeviceType.esphome:
-        return 'ESP Home';
+      case DeviceType.udp:
+        return 'UDP';
       case DeviceType.wiz:
         return 'Wiz';
       case DeviceType.tuya:

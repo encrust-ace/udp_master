@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/screen/add_device.dart';
 import 'package:udp_master/visualizer_provider.dart';
@@ -38,7 +37,7 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
-    final devices = context.watch<VisualizerProvider>().devices;
+    final devices = widget.visualizerProvider.devices;
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -52,6 +51,7 @@ class _HomeState extends State<Home> {
               spacing: 16,
               children: [
                 Expanded(
+                  flex: 2,
                   child: ButtonTheme(
                     alignedDropdown: true,
                     child: DropdownButtonFormField<String>(
@@ -65,7 +65,7 @@ class _HomeState extends State<Home> {
                           .map(
                             (String option) => DropdownMenuItem(
                               value: option,
-                              child: Text(option),
+                              child: Flexible(child: Text(option)),
                             ),
                           )
                           .toList(),
@@ -80,6 +80,7 @@ class _HomeState extends State<Home> {
                   ),
                 ),
                 Expanded(
+                  flex: 3,
                   child: ButtonTheme(
                     alignedDropdown: true,
                     child: DropdownButtonFormField<String>(
@@ -93,7 +94,7 @@ class _HomeState extends State<Home> {
                           .map(
                             (LedEffect effect) => DropdownMenuItem(
                               value: effect.id,
-                              child: Text(effect.name),
+                              child: Flexible(child: Text(effect.name)),
                             ),
                           )
                           .toList(),
@@ -194,14 +195,16 @@ class _HomeState extends State<Home> {
                                         context,
                                       ).colorScheme.primary,
                                     ),
-                                    Text(
-                                      device.name,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                    Flexible(
+                                      child: Text(
+                                        device.name,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -216,7 +219,30 @@ class _HomeState extends State<Home> {
                                       ).colorScheme.outline,
                                     ),
                                     Text(
-                                      '${device.ip}:${device.port}',
+                                      device.ip,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.outline,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  spacing: 4,
+                                  children: [
+                                    Icon(
+                                      Icons.wifi,
+                                      size: 16,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.outline,
+                                    ),
+                                    Text(
+                                      'PORT: ${device.port}',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall
@@ -283,7 +309,7 @@ class _HomeState extends State<Home> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               SizedBox(
-                                width: 200,
+                                width: 180,
                                 height: 44,
                                 child: ButtonTheme(
                                   alignedDropdown: true,
@@ -294,17 +320,21 @@ class _HomeState extends State<Home> {
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       isDense: true,
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        vertical: 12,
-                                        horizontal: 12,
-                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                            horizontal: 12,
+                                          ),
                                     ),
                                     items: widget.visualizerProvider.effects
                                         .map(
-                                          (LedEffect effect) => DropdownMenuItem(
-                                            value: effect.id,
-                                            child: Text(effect.name),
-                                          ),
+                                          (LedEffect effect) =>
+                                              DropdownMenuItem(
+                                                value: effect.id,
+                                                child: Flexible(
+                                                  child: Text(effect.name),
+                                                ),
+                                              ),
                                         )
                                         .toList(),
                                     onChanged: (val) {
