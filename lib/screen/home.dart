@@ -307,7 +307,7 @@ class _HomeState extends State<Home> {
                           ),
                           // Right: Effect selector and enable/disable button, both rectangular and aligned
                           Column(
-                            spacing: 4,
+                            spacing: 12,
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               SizedBox(
