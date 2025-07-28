@@ -40,13 +40,15 @@ class _HomeState extends State<Home> {
     final devices = widget.visualizerProvider.devices;
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(8.0),
       child: SingleChildScrollView(
         child: Column(
-          spacing: 20.0,
+          spacing: 8.0,
           crossAxisAlignment:
               CrossAxisAlignment.stretch, // Make children take full width
           children: [
+            // Header Row with Sort and Effect Dropdowns
+            SizedBox(height: 0),
             Row(
               spacing: 16,
               children: [

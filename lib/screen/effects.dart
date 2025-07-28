@@ -14,7 +14,7 @@ class _EffectsPageState extends State<EffectsPage> {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       child: ListView.builder(
-        padding: EdgeInsets.all(16),
+        padding: EdgeInsets.all(8),
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         itemCount: widget.visualizerProvider.effects.length,
