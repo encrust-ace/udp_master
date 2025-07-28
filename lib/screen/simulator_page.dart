@@ -18,23 +18,19 @@ class _SimulatorPaageState extends State<SimulatorPaage> {
       padding: const EdgeInsets.all(16.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        spacing: 50,
-        children: [
-          SizedBox(
-            width: 30,
-            child: LedStripSimulator(
-              ledCount: 50,
-              packet: widget.visualizerProvider.packets,
+        children: List.generate(
+          (MediaQuery.of(context).size.width / 50).floor(), // Dynamic number based on width
+          (index) => Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0), // Add some spacing
+              child: LedStripSimulator(
+                ledCount: (MediaQuery.of(context).size.height / 10)
+                    .floor(), // Calculate based on height
+                packet: widget.visualizerProvider.packets,
+              ),
             ),
           ),
-          SizedBox(
-            width: 30,
-            child: LedStripSimulator(
-              ledCount: 50,
-              packet: widget.visualizerProvider.packets,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

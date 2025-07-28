@@ -218,23 +218,39 @@ class VisualizerProvider with ChangeNotifier {
       }
     }
     // For simulators
-    final device = LedDevice(
-      name: "Simulator",
-      ip: "127.0.0.1",
-      port: 12345,
-      ledCount: 50,
-      effect: "volume-bars",
-      isEnabled: true,
-      type: DeviceType.esphome,
-    );
+    final device = _devices.first;
+    LedEffect? effect = getEffectById(device.effect) ?? _effects.first;
     late List<int> packetData;
-    packetData = renderBeatDropEffectTest(
-      device: device,
-      fft: fft,
-      gain: 1,
-      brightness: 1,
-      saturation: 1,
-    );
+    switch (effect.id) {
+      case 'volume-bars':
+        packetData = renderVerticalBars(
+          device: device,
+          fft: fft,
+          gain: effect.parameters["gain"]?["value"] ?? 2.0,
+          brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+          saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+        );
+        break;
+      case 'center-pulse':
+        packetData = renderCenterPulsePacket(
+          ledCount: device.ledCount,
+          fft: fft,
+          gain: effect.parameters["gain"]?["value"] ?? 2.0,
+        );
+        break;
+      case 'music-rhythm':
+        packetData = renderBeatDropEffect(
+          device: device,
+          fft: fft,
+          gain: effect.parameters["gain"]?["value"] ?? 2.0,
+          brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+          saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+          raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 10.0,
+          decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 1.0,
+          dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
+        );
+        break;
+    }
     packets = packetData;
     notifyListeners();
   }

@@ -83,7 +83,7 @@ List<int> renderBeatDropEffect({
   required double brightness,
   required double saturation,
   double raiseSpeed =
-      10.0, // Reduced speed as AGC will handle overall responsiveness
+      30.0, // Reduced speed as AGC will handle overall responsiveness
   double decaySpeed = 1, // Reduced decay speed for smoother fall
   double dropSpeed = 0.5,
   BeatFrequencyBand beatFrequencyBand =

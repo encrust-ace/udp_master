@@ -32,7 +32,7 @@ class LedStripSimulator extends StatelessWidget {
 
             return Expanded(
               child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 2),
+                margin: const EdgeInsets.symmetric(vertical: 0.05),
                 decoration: BoxDecoration(
                   color: color, // Use the calculated color
                   shape: BoxShape.circle, // Make it a circle

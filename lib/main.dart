@@ -46,6 +46,7 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
   late VisualizerProvider _visualizerProvider;
   bool _isInitialDependenciesMet = false;
   int currentPageIndex = 2;
+  bool isVisualizer = false;
 
   @override
   void didChangeDependencies() {
