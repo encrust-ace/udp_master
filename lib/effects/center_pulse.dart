@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:udp_master/models.dart';
+
 List<int> _hsvToRgb(double h, double s, double v) {
   h = h.clamp(0.0, 1.0);
   s = s.clamp(0.0, 1.0);
@@ -48,7 +50,7 @@ List<int> _hsvToRgb(double h, double s, double v) {
 }
 
 List<int> renderCenterPulsePacket({
-  required int ledCount,
+  required LedDevice device,
   required Float32List fft,
   required double gain,
 }) {
@@ -60,10 +62,10 @@ List<int> renderCenterPulsePacket({
 
   double avg = sum / fft.length;
   double normalized = (avg * gain).clamp(0.0, 1.0);
-  double half = ledCount / 2;
+  double half = device.ledCount / 2;
   double spread = normalized * half;
   double hue = (1.0 - spread) * 0.7; // high intensity = red
-  for (int i = 0; i < ledCount; i++) {
+  for (int i = 0; i < device.ledCount; i++) {
     double dist = (i - half + 0.5).abs(); // for even counts
     if (dist < spread) {
       double intensity = (1.0 - (dist / spread)).clamp(0.0, 1.0);

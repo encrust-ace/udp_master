@@ -87,7 +87,7 @@ class VisualizerProvider with ChangeNotifier {
       id: 'music-rhythm',
       name: 'Music Rhythm',
       parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 1.0, 'steps': 8},
         'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
         'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
         'raiseSpeed': {'min': 5.0, 'max': 30.0, 'value': 10.0, 'steps': 10},
@@ -160,7 +160,7 @@ class VisualizerProvider with ChangeNotifier {
               break;
             case 'center-pulse':
               packetData = renderCenterPulsePacket(
-                ledCount: device.ledCount,
+                device: device,
                 fft: fft,
                 gain: effect.parameters["gain"]?["value"] ?? 2.0,
               );
@@ -241,7 +241,7 @@ class VisualizerProvider with ChangeNotifier {
         break;
       case 'center-pulse':
         packetData = renderCenterPulsePacket(
-          ledCount: device.ledCount,
+          device: device,
           fft: fft,
           gain: effect.parameters["gain"]?["value"] ?? 2.0,
         );
@@ -286,9 +286,7 @@ class VisualizerProvider with ChangeNotifier {
         case DeviceAction.add:
           for (LedDevice device in devices) {
             // Check for duplicate (by name or IP)
-            final int index = _devices.indexWhere(
-              (d) => d.ip == device.ip,
-            );
+            final int index = _devices.indexWhere((d) => d.ip == device.ip);
             if (index != -1) {
               _devices[index] = device;
               continue;
@@ -312,9 +310,7 @@ class VisualizerProvider with ChangeNotifier {
           break;
       }
       final prefs = await SharedPreferences.getInstance();
-      final deviceList = _devices
-          .map((e) => json.encode(e.toJson()))
-          .toList();
+      final deviceList = _devices.map((e) => json.encode(e.toJson())).toList();
       await prefs.setStringList('devices', deviceList);
       notifyListeners();
       if (context.mounted) {
