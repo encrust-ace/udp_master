@@ -82,18 +82,18 @@ List<int> renderBeatDropEffect({
   required double gain, // This 'gain' now acts as a master sensitivity/pre-amp
   required double brightness,
   required double saturation,
-  double raiseSpeed =
-      30.0, // Reduced speed as AGC will handle overall responsiveness
-  double decaySpeed = 1, // Reduced decay speed for smoother fall
-  double dropSpeed = 0.5,
-  BeatFrequencyBand beatFrequencyBand =
-      BeatFrequencyBand.bass, // Make this configurable
-  double beatThreshold = 0.3, // Increased threshold for clearer beat detection
-  int retriggerDelayMs =
-      150, // Added retrigger delay to avoid multiple detections for one beat
-  double squelch = 0.005, // Minimum energy to react to, filters out noise
+  required raiseSpeed,
+  required double decaySpeed, // Reduced decay speed for smoother fall
+  required double dropSpeed,
 }) {
   final int count = device.ledCount;
+  BeatFrequencyBand beatFrequencyBand =
+      BeatFrequencyBand.bass; // Make this configurable
+  final double beatThreshold =
+      0.1; // Increased threshold for clearer beat detection
+  final int retriggerDelayMs =
+      100; // Added retrigger delay to avoid multiple detections for one beat
+  final double squelch = 0.1; // Minimum energy to react to, filters out noise
   if (count == 0 || fft.isEmpty) return [0x02, 0x04];
 
   final List<int> packet = [0x02, 0x04];

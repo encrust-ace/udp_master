@@ -63,15 +63,16 @@ class _EffectsPageState extends State<EffectsPage> {
                       final value = parameter.value;
                       final min = value["min"];
                       final max = value["max"];
+                      final steps = value["steps"] ?? 20;
                       final currentValue = value["value"];
                       return Row(
                         spacing: 8,
                         children: [
                           SizedBox(width: 100, child: Text(key)),
-                          Text(currentValue.toString()),
+                          Text(currentValue.toStringAsFixed(2)),
                           Expanded(
                             child: Slider(
-                              divisions: 10,
+                              divisions: steps,
                               value: currentValue,
                               min: min,
                               max: max,

@@ -12,7 +12,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp/udp.dart';
 import 'package:udp_master/effects/center_pulse.dart';
 import 'package:udp_master/effects/music_rhythm.dart';
-import 'package:udp_master/effects/test2.dart';
 import 'package:udp_master/effects/volume_bars.dart';
 import 'package:udp_master/models.dart';
 
@@ -49,6 +48,15 @@ class VisualizerProvider with ChangeNotifier {
   bool _isRunning = false;
   bool get isRunning => _isRunning;
   List<int> packets = [];
+  int _currentSelectedTab = 0;
+  int get currentSelectedTab => _currentSelectedTab;
+
+  Future<void> setCurrentSelectedTab(int value) async {
+    _currentSelectedTab = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('currentSelectedTab', value);
+    notifyListeners();
+  }
 
   StreamSubscription? _micSubscription;
 
@@ -63,28 +71,28 @@ class VisualizerProvider with ChangeNotifier {
       id: 'volume-bars',
       name: 'Volume Bars',
       parameters: {
-        'gain': {'min': 0.0, 'max': 5.0, 'value': 2.0},
-        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0},
-        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0},
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 9},
+        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
       },
     ),
     LedEffect(
       id: 'center-pulse',
       name: 'Center Pulse',
       parameters: {
-        'gain': {'min': 0.0, 'max': 5.0, 'value': 2.0},
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 9},
       },
     ),
     LedEffect(
       id: 'music-rhythm',
       name: 'Music Rhythm',
       parameters: {
-        'gain': {'min': 0.0, 'max': 5.0, 'value': 2.0},
-        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0},
-        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0},
-        'raiseSpeed': {'min': 5.0, 'max': 50.0, 'value': 10.0},
-        'decaySpeed': {'min': 1.0, 'max': 10.0, 'value': 1.0},
-        'dropSpeed': {'min': 0.1, 'max': 1.0, 'value': 0.5},
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 9},
+        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+        'raiseSpeed': {'min': 5.0, 'max': 30.0, 'value': 10.0, 'steps': 10},
+        'decaySpeed': {'min': 0.3, 'max': 2.0, 'value': 0.4, 'steps': 17},
+        'dropSpeed': {'min': 0.1, 'max': 1.0, 'value': 0.5, 'steps': 10},
       },
     ),
   ];
@@ -257,14 +265,15 @@ class VisualizerProvider with ChangeNotifier {
 
   // --- Device Management ---
 
-  Future<List<LedDevice>> loadDevices() async {
+  Future<void> initiateTheAppData() async {
     final prefs = await SharedPreferences.getInstance();
     final deviceList = prefs.getStringList('devices') ?? [];
     _devices = deviceList
         .map((e) => LedDevice.fromJson(json.decode(e)))
         .toList();
+    final currectSelectedTab = prefs.getInt('currentSelectedTab') ?? 0;
+    _currentSelectedTab = currectSelectedTab;
     notifyListeners();
-    return _devices;
   }
 
   Future<bool> deviceActions(
@@ -273,38 +282,37 @@ class VisualizerProvider with ChangeNotifier {
     DeviceAction action,
   ) async {
     try {
-      List<LedDevice> existingDevices = await loadDevices();
       switch (action) {
         case DeviceAction.add:
           for (LedDevice device in devices) {
             // Check for duplicate (by name or IP)
-            final int index = existingDevices.indexWhere(
+            final int index = _devices.indexWhere(
               (d) => d.ip == device.ip,
             );
             if (index != -1) {
-              existingDevices[index] = device;
+              _devices[index] = device;
               continue;
             } else {
-              existingDevices.add(device);
+              _devices.add(device);
             }
           }
           break;
         case DeviceAction.update:
           for (LedDevice device in devices) {
-            int index = existingDevices.indexWhere((d) => d.ip == device.ip);
+            int index = _devices.indexWhere((d) => d.ip == device.ip);
             if (index != -1) {
-              existingDevices[index] = device;
+              _devices[index] = device;
             }
           }
           break;
         case DeviceAction.delete:
           for (LedDevice device in devices) {
-            existingDevices.removeWhere((d) => d.ip == device.ip);
+            _devices.removeWhere((d) => d.ip == device.ip);
           }
           break;
       }
       final prefs = await SharedPreferences.getInstance();
-      final deviceList = existingDevices
+      final deviceList = _devices
           .map((e) => json.encode(e.toJson()))
           .toList();
       await prefs.setStringList('devices', deviceList);
@@ -314,7 +322,7 @@ class VisualizerProvider with ChangeNotifier {
           SnackBar(content: Text('Device list updated successfully!')),
         );
       }
-      _devices = existingDevices;
+      notifyListeners();
       return true;
     } catch (e) {
       if (context.mounted) {

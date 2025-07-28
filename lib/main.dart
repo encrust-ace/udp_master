@@ -45,7 +45,6 @@ class VisualizerScreen extends StatefulWidget {
 class _VisualizerScreenState extends State<VisualizerScreen> {
   late VisualizerProvider _visualizerProvider;
   bool _isInitialDependenciesMet = false;
-  int currentPageIndex = 2;
   bool isVisualizer = false;
 
   @override
@@ -56,7 +55,7 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
         context,
         listen: true,
       );
-      _visualizerProvider.loadDevices();
+      _visualizerProvider.initiateTheAppData();
       // Or, if you need to watch it for this screen:
       // final service = context.watch<VisualizerService>();
       // service.loadAndSetInitialDevices();
@@ -92,10 +91,10 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
       bottomNavigationBar: NavigationBar(
         onDestinationSelected: (int index) {
           setState(() {
-            currentPageIndex = index;
+            _visualizerProvider.setCurrentSelectedTab(index);
           });
         },
-        selectedIndex: currentPageIndex,
+        selectedIndex: _visualizerProvider.currentSelectedTab,
         destinations: [
           NavigationDestination(
             selectedIcon: Icon(Icons.home),
@@ -118,7 +117,7 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
         Home(visualizerProvider: _visualizerProvider),
         EffectsPage(visualizerProvider: _visualizerProvider),
         SimulatorPaage(visualizerProvider: _visualizerProvider,)
-      ][currentPageIndex],
+      ][_visualizerProvider.currentSelectedTab],
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await _visualizerProvider.toggleVisualizer();
