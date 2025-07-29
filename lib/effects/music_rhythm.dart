@@ -62,7 +62,7 @@ double _currentRisingLedsCount = 0.0; // How many LEDs are currently "lit up" fr
 double _currentDropLogicalPos = 0.0; // The logical position of the "falling" beat drop element.
 int _lastBeatDetectedTime = 0; // Timestamp of the last detected beat to prevent rapid re-triggering.
 List<double> _energyHistory = []; // Stores recent audio energy levels to calculate a dynamic threshold.
-final int _historyLength = 0; // How many past energy samples to keep in history.
+final int _historyLength = 30; // How many past energy samples to keep in history.
 
 // Variables for dynamic gain adjustment and rainbow effect.
 double _currentGain = 1.0; // Current amplification of the audio signal.
@@ -86,7 +86,7 @@ List<int> renderBeatDropEffect({
   final int count = device.ledCount; // Total number of LEDs on the device.
   BeatFrequencyBand beatFrequencyBand = BeatFrequencyBand.bass; // Which part of the sound spectrum to focus on for beats.
   final double beatThreshold = 0.1; // How much louder a sound needs to be than average to be considered a beat.
-  final int retriggerDelayMs = 0; // Minimum time between detected beats to prevent flickering.
+  final int retriggerDelayMs = 150; // Minimum time between detected beats to prevent flickering.
   final double squelch = 0.1; // A minimum energy level below which sound is ignored (noise gate).
 
   // If no LEDs or no audio data, return a default empty packet.
