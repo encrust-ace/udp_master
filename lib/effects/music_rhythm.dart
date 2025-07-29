@@ -1,21 +1,24 @@
 import 'dart:typed_data';
 
-import 'package:udp_master/models.dart'; // Assuming this provides LedDevice
+import 'package:udp_master/models.dart';
 
-// Enum for frequency band selection (unchanged)
+// Enum to define which frequency band (bass, mids, highs) we are listening for beats.
 enum BeatFrequencyBand { bass, mids, highs }
 
-// Helper function to convert HSV to RGB (unchanged)
+// Helper function to convert HSV (Hue, Saturation, Value) color to RGB (Red, Green, Blue).
+// This allows for creating smooth color gradients and vibrant effects.
 List<int> _hsvToRgb(double h, double s, double v) {
-  h = h.clamp(0.0, 1.0);
-  s = s.clamp(0.0, 1.0);
-  v = v.clamp(0.0, 1.0);
-  int i = (h * 6).floor();
-  double f = h * 6 - i;
+  h = h.clamp(0.0, 1.0); // Ensure hue is between 0 and 1
+  s = s.clamp(0.0, 1.0); // Ensure saturation is between 0 and 1
+  v = v.clamp(0.0, 1.0); // Ensure value (brightness) is between 0 and 1
+  int i = (h * 6).floor(); // Which "sextant" of the color wheel we are in
+  double f = h * 6 - i; // Fractional part for interpolation
   double p = v * (1 - s);
   double q = v * (1 - f * s);
   double t = v * (1 - (1 - f) * s);
-  double r, g, b;
+  double r, g, b; // Red, Green, Blue components
+
+  // Convert based on the sextant
   switch (i % 6) {
     case 0:
       r = v;
@@ -50,77 +53,77 @@ List<int> _hsvToRgb(double h, double s, double v) {
     default:
       r = g = b = 0;
   }
+  // Convert 0-1 values to 0-255 and return as a list of integers
   return [(r * 255).round(), (g * 255).round(), (b * 255).round()];
 }
 
-// --- Global state variables for the effect ---
-double _currentRisingLedsCount = 0.0;
+// Variables to track the state of the beat drop effect over time.
+double _currentRisingLedsCount = 0.0; // How many LEDs are currently "lit up" from the bottom.
+double _currentDropLogicalPos = 0.0; // The logical position of the "falling" beat drop element.
+int _lastBeatDetectedTime = 0; // Timestamp of the last detected beat to prevent rapid re-triggering.
+List<double> _energyHistory = []; // Stores recent audio energy levels to calculate a dynamic threshold.
+final int _historyLength = 0; // How many past energy samples to keep in history.
 
-// Drop animation state
-// We'll manage this so it effectively cycles, representing both falling and rising
-double _currentDropLogicalPos = 0.0;
+// Variables for dynamic gain adjustment and rainbow effect.
+double _currentGain = 1.0; // Current amplification of the audio signal.
+final double _gainAttack = 0.005; // How quickly the gain reduces when loudness is high.
+final double _gainDecay = 0.001; // How quickly the gain increases when loudness is low.
+final double _targetLoudness = 0.1; // The desired average loudness level.
+double _rainbowHueOffset = 0.0; // Current position in the rainbow color cycle.
+final double _rainbowSpeed = 0.005; // How fast the rainbow colors cycle.
 
-// Beat detection state
-int _lastBeatDetectedTime = 0;
-List<double> _energyHistory = [];
-final int _historyLength = 30;
-
-// Automatic Gain Control (AGC) state
-double _currentGain = 1.0;
-final double _gainAttack = 0.005;
-final double _gainDecay = 0.001;
-final double _targetLoudness = 0.1;
-
-// Aesthetic state
-double _rainbowHueOffset = 0.0;
-final double _rainbowSpeed = 0.005;
-
+// Main function to render the beat drop effect for a given LED device.
 List<int> renderBeatDropEffect({
-  required LedDevice device,
-  required Float32List fft,
-  required double gain,
-  required double brightness,
-  required double saturation,
-  required double raiseSpeed,
-  required double decaySpeed,
-  required double dropSpeed,
+  required LedDevice device, // The LED device configuration (e.g., number of LEDs).
+  required Float32List fft, // Fast Fourier Transform data, representing audio frequencies.
+  required double gain, // User-defined gain for the effect sensitivity.
+  required double brightness, // User-defined brightness for the effect.
+  required double saturation, // User-defined color saturation for the effect.
+  required double raiseSpeed, // How fast LEDs rise from the bottom on a beat.
+  required double decaySpeed, // How fast LEDs fade/decay after rising.
+  required double dropSpeed, // How fast the "dropping" beat indicator moves.
 }) {
-  final int count = device.ledCount;
-  BeatFrequencyBand beatFrequencyBand = BeatFrequencyBand.bass;
-  final double beatThreshold = 0.1;
-  final int retriggerDelayMs = 150;
-  final double squelch = 0.1;
+  final int count = device.ledCount; // Total number of LEDs on the device.
+  BeatFrequencyBand beatFrequencyBand = BeatFrequencyBand.bass; // Which part of the sound spectrum to focus on for beats.
+  final double beatThreshold = 0.1; // How much louder a sound needs to be than average to be considered a beat.
+  final int retriggerDelayMs = 0; // Minimum time between detected beats to prevent flickering.
+  final double squelch = 0.1; // A minimum energy level below which sound is ignored (noise gate).
+
+  // If no LEDs or no audio data, return a default empty packet.
   if (count == 0 || fft.isEmpty) return [0x02, 0x04];
 
+  // Initialize the packet with WLED specific header (0x02 for '2D' or 'DRGB' mode, 0x04 for refresh rate).
   final List<int> packet = [0x02, 0x04];
-  final int now = DateTime.now().millisecondsSinceEpoch;
+  final int now = DateTime.now().millisecondsSinceEpoch; // Current time for beat re-triggering.
+  final int fftLen = fft.length; // Total length of the FFT data.
 
-  // --- FFT Band Energy Calculation (unchanged) ---
-  final int fftLen = fft.length;
-  final int bassEnd = (fftLen * 0.1).floor();
-  final int midsEnd = (fftLen * 0.4).floor();
+  // Define frequency band boundaries within the FFT data.
+  final int bassEnd = (fftLen * 0.1).floor(); // First 10% of FFT is bass.
+  final int midsEnd = (fftLen * 0.4).floor(); // Next 30% is mids (up to 40% of total).
 
+  // Calculate average energy for bass, mids, and highs.
   double bassAvg = 0.0, midAvg = 0.0, highAvg = 0.0;
 
   if (bassEnd > 0) {
     for (int i = 0; i < bassEnd; i++) {
-      bassAvg += fft[i].abs();
+      bassAvg += fft[i].abs(); // Sum absolute values of bass frequencies.
     }
-    bassAvg /= bassEnd;
+    bassAvg /= bassEnd; // Average bass energy.
   }
   if (midsEnd > bassEnd) {
     for (int i = bassEnd; i < midsEnd; i++) {
-      midAvg += fft[i].abs();
+      midAvg += fft[i].abs(); // Sum absolute values of mid frequencies.
     }
-    midAvg /= (midsEnd - bassEnd);
+    midAvg /= (midsEnd - bassEnd); // Average mid energy.
   }
   if (fftLen > midsEnd) {
     for (int i = midsEnd; i < fftLen; i++) {
-      highAvg += fft[i].abs();
+      highAvg += fft[i].abs(); // Sum absolute values of high frequencies.
     }
-    highAvg /= (fftLen - midsEnd);
+    highAvg /= (fftLen - midsEnd); // Average high energy.
   }
 
+  // Determine the raw beat energy based on the selected frequency band.
   double rawBeatEnergy;
   switch (beatFrequencyBand) {
     case BeatFrequencyBand.bass:
@@ -134,136 +137,106 @@ List<int> renderBeatDropEffect({
       break;
   }
 
-  double processedEnergy = rawBeatEnergy * gain;
-
-  // --- Automatic Gain Control (AGC) (unchanged) ---
+  // --- Dynamic Gain Adjustment (Automatic Volume Control) ---
+  // This helps the effect respond consistently regardless of input volume.
+  double processedEnergy = rawBeatEnergy * gain; // Apply user-defined gain to raw energy.
   if (processedEnergy > _targetLoudness) {
-    _currentGain -= _gainAttack * (processedEnergy - _targetLoudness);
+    _currentGain -= _gainAttack * (processedEnergy - _targetLoudness); // Reduce gain if too loud.
   } else if (processedEnergy < _targetLoudness / 2) {
-    _currentGain += _gainDecay * (_targetLoudness - processedEnergy);
+    _currentGain += _gainDecay * (_targetLoudness - processedEnergy); // Increase gain if too quiet.
   } else {
-    _currentGain -= _gainDecay * 0.1;
+    _currentGain -= _gainDecay * 0.1; // Slowly decay gain even when near target.
   }
-  _currentGain = _currentGain.clamp(0.5, 5.0);
+  _currentGain = _currentGain.clamp(0.5, 5.0); // Keep gain within a reasonable range.
 
+  // Calculate current energy with the adjusted dynamic gain.
   double currentEnergy = rawBeatEnergy * _currentGain;
 
+  // Apply squelch: if energy is below this, set to zero to filter out background noise.
   if (currentEnergy < squelch) {
     currentEnergy = 0.0;
   }
 
+  // Update energy history for dynamic threshold calculation.
   _energyHistory.add(currentEnergy);
-  if (_energyHistory.length > _historyLength) _energyHistory.removeAt(0);
+  if (_energyHistory.length > _historyLength) _energyHistory.removeAt(0); // Keep history length fixed.
 
+  // Calculate the average energy from the history.
   double avgHistoryEnergy = _energyHistory.isEmpty
       ? 0.0
       : _energyHistory.reduce((a, b) => a + b) / _energyHistory.length;
 
+  // Calculate a dynamic threshold for beat detection: average history + a beat sensitivity margin.
   final double dynamicThreshold = avgHistoryEnergy * (1.0 + beatThreshold) + 0.005;
-  final bool beatDetectedThisFrame = currentEnergy > dynamicThreshold;
+  final bool beatDetectedThisFrame = currentEnergy > dynamicThreshold; // Is the current energy above the threshold?
 
-  // --- Animation State Update ---
+  // --- Beat Triggering Logic ---
+  // If a beat is detected AND enough time has passed since the last beat:
   if (beatDetectedThisFrame && (now - _lastBeatDetectedTime > retriggerDelayMs)) {
-    // Beat detected: Grow the bar and reset the drop to the top.
-    _currentRisingLedsCount += raiseSpeed;
-    _currentDropLogicalPos = 0.0; // Always reset to the logical top on beat
-    _lastBeatDetectedTime = now;
+    _currentRisingLedsCount += raiseSpeed; // Make more LEDs rise from the bottom.
+    _currentDropLogicalPos = 0.0; // Reset the dropping element to the top.
+    _lastBeatDetectedTime = now; // Update last beat time.
   } else {
-    // No beat: Decay the bar.
-    _currentRisingLedsCount -= decaySpeed;
+    _currentRisingLedsCount -= decaySpeed; // Otherwise, LEDs decay from the bottom.
   }
 
+  // Clamp the rising LEDs count to prevent it from going out of bounds.
   _currentRisingLedsCount = _currentRisingLedsCount.clamp(0.0, count.toDouble());
 
-  // --- Drop LED Animation Logic (MODIFIED to use raiseSpeed for return) ---
-  // The drop continuously moves.
-  // If _currentDropLogicalPos is less than 'count', it's falling.
-  // If _currentDropLogicalPos is 'count' or more, it has "hit the bottom" and is
-  // now conceptually moving upwards or resetting.
-
+  // --- Dropping Effect Logic ---
+  // If the dropping element hasn't reached the bottom yet, keep it moving.
   if (_currentDropLogicalPos < count) {
-    // Drop is currently falling
     _currentDropLogicalPos += dropSpeed;
   } else {
-    // Drop has passed the bottom, now "move" it back to the top quickly
-    // by decrementing from its current 'off-screen' position.
-    // This makes it visually reappear at the top quickly.
-    _currentDropLogicalPos += raiseSpeed; // Use raiseSpeed to move it upwards
-
-    // If it has moved "off the top" (become very large due to successive raiseSpeeds without reset)
-    // or if we simply want it to always cycle through the visible range after hitting the bottom.
-    // The modulo operation helps keep it within bounds while simulating a wrap-around
-    // or a fast ascent from below the screen.
-    // We want it to be 0 when it should be at the top after its fast ascent.
-    // Let's ensure it stays within a manageable range for rendering.
-    if (_currentDropLogicalPos >= count + count * 0.5) { // If it's well past bottom, snap it back
-        _currentDropLogicalPos = 0.0; // Or ( _currentDropLogicalPos % count ); for looping
+    // Once it reaches the bottom, reset it to the top or slightly above the top
+    // to create a continuous falling effect. The logic here creates a "wrap-around"
+    // or continuous falling visual.
+    _currentDropLogicalPos += raiseSpeed; // A small boost to ensure it moves past 'count'
+    if (_currentDropLogicalPos >= count + count * 0.5) { // If it goes too far past, reset
+        _currentDropLogicalPos = 0.0;
     }
-
-    // A simpler way: if it hits bottom, reset it to a negative value corresponding to
-    // its effective starting point for the fast ascent.
-    // On beat, _currentDropLogicalPos is 0.0.
-    // It increases by dropSpeed.
-    // When _currentDropLogicalPos >= count, it hit the bottom.
-    // To make it rise fast from the bottom, it should go from `count` back to `0`.
-    // We can simulate this by making the "effective" position from `count` to `0` using `raiseSpeed`.
-    // This is probably best done by resetting and then adding raiseSpeed *after* hitting the bottom.
-
-    // Let's refine the logic to make it clearer for "fast ascent":
-    // The `_currentDropLogicalPos` should always represent the position from 0 (top) to count (bottom).
-    // When it goes past `count`, it means it's "off screen at the bottom".
-    // We now want it to animate from this "off screen bottom" to "on screen top".
-    // A more explicit state-based system makes this cleaner without extra variables:
-    // This current approach of just continually incrementing will make the drop appear to
-    // accelerate off screen then slowly return.
-
-    // Reverting to the logic that makes it behave like a "fast teleport to top" when it hits the bottom.
-    // This is done by checking if it exceeded `count`.
+    // This condition seems to reset the drop position slightly differently,
+    // potentially making it appear from the very top (`count - 1`) again.
+    // It's a bit of a tricky logic for a continuous loop.
     if (_currentDropLogicalPos >= count) {
-        // If it goes off the bottom, immediately set it to "off the top, ready to rise".
-        // The value `-(count - 1)` means it's just off the top by the full strip length.
-        // Then, the next `+ raiseSpeed` will bring it onto the screen.
-        _currentDropLogicalPos = -(count - 1).toDouble(); // Set to effectively "off screen top"
+        _currentDropLogicalPos = -(count - 1).toDouble();
     }
   }
 
-  // Always update rainbow hue offset for continuous color shift
+  // Update the rainbow color offset for the next frame.
   _rainbowHueOffset = (_rainbowHueOffset + _rainbowSpeed) % 1.0;
 
-  // --- Render LEDs ---
-  final int risingBottomLeds = _currentRisingLedsCount.round();
-  // Ensure dropLedPosition is always a valid index or logically handled
-  // We need to map _currentDropLogicalPos (which can be negative) to a visible LED index [0, count-1]
-  int dropLedPosition = _currentDropLogicalPos.floor();
+  // --- Render LEDs (Determine Color for Each LED) ---
+  final int risingBottomLeds = _currentRisingLedsCount.round(); // Number of LEDs to light from the bottom.
+  int dropLedPosition = _currentDropLogicalPos.floor(); // Current integer position of the dropping LED.
 
+  // Loop through each LED to determine its color.
   for (int i = 0; i < count; i++) {
-    List<int> ledColor = [0, 0, 0]; // Default to OFF
+    List<int> ledColor = [0, 0, 0]; // Default color is off (black).
 
-    // Render the growing/decaying bar.
+    // LEDs at the bottom (rising from a beat) get a rainbow color.
     if (i < risingBottomLeds) {
-      double hue = (_rainbowHueOffset + (i / count)).remainder(1.0);
-      ledColor = _hsvToRgb(hue, saturation, brightness);
+      double hue = (_rainbowHueOffset + (i / count)).remainder(1.0); // Calculate hue based on position and global offset.
+      ledColor = _hsvToRgb(hue, saturation, brightness); // Convert to RGB.
     }
 
-    // Always keep the first LED (index 0) on with a rainbow color (if desired)
+    // The very first LED (bottom-most) always gets a special rainbow color if active.
+    // This might be redundant with the `i < risingBottomLeds` if `risingBottomLeds` can be 0.
+    // Or it ensures the first pixel always shows the current global rainbow hue.
     if (i == 0) {
       double hue = _rainbowHueOffset;
       ledColor = _hsvToRgb(hue, saturation, brightness);
     }
 
-    // Overlay the drop LED
-    // `actualDropLedIndex` maps logical position (0=top, count-1=bottom) to physical index.
-    // If _currentDropLogicalPos is 0 (top), actualDropLedIndex is count-1.
-    // If _currentDropLogicalPos is count-1 (bottom), actualDropLedIndex is 0.
+    // Calculate the actual index for the "dropping" LED (from top to bottom).
     int actualDropLedIndex = count - 1 - dropLedPosition;
-
-    // Only render the drop if its logical position is within the visible range [0, count-1]
+    // If the current LED is the dropping LED, give it a rainbow color.
     if (dropLedPosition >= 0 && dropLedPosition < count && i == actualDropLedIndex) {
       double dropHue = (_rainbowHueOffset + (actualDropLedIndex / count)).remainder(1.0);
       ledColor = _hsvToRgb(dropHue, saturation, brightness);
     }
-    packet.addAll(ledColor);
+    packet.addAll(ledColor); // Add the RGB color of the current LED to the packet.
   }
 
-  return packet;
+  return packet; // Return the final LED packet data.
 }

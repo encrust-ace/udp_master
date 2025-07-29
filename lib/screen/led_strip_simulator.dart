@@ -12,36 +12,50 @@ class LedStripSimulator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = packet.length > 2
-        ? packet.sublist(2)
-        : List.filled(ledCount * 3, 0);
+    // Ensure we only compute the necessary RGB data once
+    final List<Color> ledColors = List.generate(ledCount, (index) {
+      final i = 2 + index * 3;
+      if (i + 2 < packet.length) {
+        return Color.fromARGB(255, packet[i], packet[i + 1], packet[i + 2]);
+      } else {
+        return Colors.black;
+      }
+    });
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: List.generate(ledCount, (index) {
-            final i = index * 3;
-            Color color = Colors.black;
-            if (i + 2 < data.length) {
-              final r = data[i];
-              final g = data[i + 1];
-              final b = data[i + 2];
-              color = Color.fromARGB(255, r, g, b);
-            }
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: ledColors.reversed.map((color) {
+        return const Expanded(
+          child: _LedDot(color: Colors.black), // Placeholder, color gets overridden below
+        ).copyWithColor(color);
+      }).toList(),
+    );
+  }
+}
 
-            return Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 0.05),
-                decoration: BoxDecoration(
-                  color: color, // Use the calculated color
-                  shape: BoxShape.circle, // Make it a circle
-                ),
-              ),
-            );
-          }).reversed.toList(), // Reversed so LED[0] is at bottom
-        );
-      },
+class _LedDot extends StatelessWidget {
+  final Color color;
+
+  const _LedDot({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 0.05),
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+extension on Expanded {
+  /// Allows you to override the color of the child `_LedDot`.
+  Expanded copyWithColor(Color newColor) {
+    return Expanded(
+      flex: flex,
+      child: _LedDot(color: newColor),
     );
   }
 }

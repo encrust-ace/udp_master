@@ -19,15 +19,14 @@ class _HomeState extends State<Home> {
 
   @override
   void initState() {
-    _selectedGlobalEffect = widget.visualizerProvider.effects.first;
     super.initState();
+    _selectedGlobalEffect = widget.visualizerProvider.effects.first;
   }
 
-  void _applyGlobalEffect(BuildContext context, String effectId) {
-    List<LedDevice> devices = widget.visualizerProvider.devices;
-    List<LedDevice> updatedDevices = devices.map((device) {
-      return device.copyWith(effect: effectId);
-    }).toList();
+  void _applyGlobalEffect(String effectId) {
+    final updatedDevices = widget.visualizerProvider.devices
+        .map((d) => d.copyWith(effect: effectId))
+        .toList();
     widget.visualizerProvider.deviceActions(
       context,
       updatedDevices,
@@ -35,374 +34,274 @@ class _HomeState extends State<Home> {
     );
   }
 
+  List<LedDevice> _getSortedDevices() {
+    final devices = widget.visualizerProvider.devices;
+    if (_selectedSortOption == 'IP') {
+      return [...devices]..sort((a, b) => a.ip.compareTo(b.ip));
+    }
+    return [...devices]..sort((a, b) => a.name.compareTo(b.name));
+  }
+
   @override
   Widget build(BuildContext context) {
-    final devices = widget.visualizerProvider.devices;
+    final devices = _getSortedDevices();
 
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: SingleChildScrollView(
         child: Column(
-          spacing: 8.0,
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch, // Make children take full width
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header Row with Sort and Effect Dropdowns
-            SizedBox(height: 0),
-            Row(
-              spacing: 16,
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: ButtonTheme(
-                    alignedDropdown: true,
-                    child: DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(
-                        labelText: 'Sort By',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.sort),
-                      ),
-                      value: _selectedSortOption,
-                      items: _sortOptions
-                          .map(
-                            (String option) => DropdownMenuItem(
-                              value: option,
-                              child: Flexible(child: Text(option)),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (newOption) {
-                        if (newOption != null) {
-                          setState(() {
-                            _selectedSortOption = newOption;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: ButtonTheme(
-                    alignedDropdown: true,
-                    child: DropdownButtonFormField<String>(
-                      decoration: const InputDecoration(
-                        labelText: 'Select Effect',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.filter_vintage_outlined),
-                      ),
-                      value: _selectedGlobalEffect.id,
-                      items: widget.visualizerProvider.effects
-                          .map(
-                            (LedEffect effect) => DropdownMenuItem(
-                              value: effect.id,
-                              child: Flexible(child: Text(effect.name)),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (newEffectId) {
-                        if (newEffectId != null) {
-                          _applyGlobalEffect(context, newEffectId);
-                        }
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            const SizedBox(height: 8),
+            _buildHeaderControls(),
+            const SizedBox(height: 12),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: devices.length,
-              itemBuilder: (context, index) {
-                final device = devices[index];
-                return Dismissible(
-                  key: ValueKey(
-                    device.name + device.ip + device.port.toString(),
-                  ),
-                  direction: DismissDirection.endToStart,
-                  confirmDismiss: (direction) async {
-                    return await showDialog<bool>(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Delete Device?'),
-                            content: Text(
-                              'Are you sure you want to delete "${device.name}"?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () =>
-                                    Navigator.of(context).pop(false),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  widget.visualizerProvider.deviceActions(
-                                    context,
-                                    [device],
-                                    DeviceAction.delete,
-                                  );
-                                  Navigator.of(context).pop(true);
-                                },
-                                child: const Text(
-                                  'Delete',
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ) ??
-                        false;
-                  },
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    color: Colors.redAccent,
-                    child: const Icon(
-                      Icons.delete,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                  ),
-
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 18.0,
-                        horizontal: 18.0,
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Left: Device details, spaced between
-                          Expanded(
-                            child: Column(
-                              spacing: 4,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  spacing: 4,
-                                  children: [
-                                    Icon(
-                                      Icons.lightbulb,
-                                      size: 16,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                    ),
-                                    Flexible(
-                                      child: Text(
-                                        device.name,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Row(
-                                  spacing: 4,
-                                  children: [
-                                    Icon(
-                                      Icons.lan,
-                                      size: 16,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.outline,
-                                    ),
-                                    Text(
-                                      device.ip,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.outline,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                                Row(
-                                  spacing: 4,
-                                  children: [
-                                    Icon(
-                                      Icons.wifi,
-                                      size: 16,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.outline,
-                                    ),
-                                    Text(
-                                      'PORT: ${device.port}',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.outline,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                                Row(
-                                  spacing: 4,
-                                  children: [
-                                    Icon(
-                                      Icons.linear_scale,
-                                      size: 16,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.outline,
-                                    ),
-                                    Text(
-                                      'LEDs: ${device.ledCount}',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.outline,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                                Row(
-                                  spacing: 4,
-                                  children: [
-                                    Icon(
-                                      Icons.category,
-                                      size: 16,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.outline,
-                                    ),
-                                    Text(
-                                      device.type.displayName,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.outline,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Right: Effect selector and enable/disable button, both rectangular and aligned
-                          Column(
-                            spacing: 12,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(
-                                width: 180,
-                                height: 44,
-                                child: ButtonTheme(
-                                  alignedDropdown: true,
-                                  child: DropdownButtonFormField<String>(
-                                    value: device.effect,
-                                    decoration: InputDecoration(
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      isDense: true,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                            horizontal: 12,
-                                          ),
-                                    ),
-                                    items: widget.visualizerProvider.effects
-                                        .map(
-                                          (LedEffect effect) =>
-                                              DropdownMenuItem(
-                                                value: effect.id,
-                                                child: Flexible(
-                                                  child: Text(effect.name),
-                                                ),
-                                              ),
-                                        )
-                                        .toList(),
-                                    onChanged: (val) {
-                                      if (val != null) {
-                                        widget.visualizerProvider.deviceActions(
-                                          context,
-                                          [device.copyWith(effect: val)],
-                                          DeviceAction.update,
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ),
-                              Row(
-                                spacing: 16,
-                                children: [
-                                  FilledButton(
-                                    onPressed: () async {
-                                      showDialog(
-                                        barrierDismissible: false,
-                                        useSafeArea: true,
-                                        context: context,
-                                        builder: (BuildContext context) {
-                                          return Dialog(
-                                            child: AddDevice(
-                                              visualizerProvider:
-                                                  widget.visualizerProvider,
-                                              device: device,
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    },
-                                    child: Icon(Icons.edit_note, size: 26),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () {
-                                      widget.visualizerProvider
-                                          .deviceActions(context, [
-                                            device.copyWith(
-                                              isEnabled: !device.isEnabled,
-                                            ),
-                                          ], DeviceAction.update);
-                                    },
-                                    child: Icon(
-                                      device.isEnabled
-                                          ? Icons.pause_circle_filled
-                                          : Icons.play_circle_fill,
-                                      size: 26,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
+              itemBuilder: (context, index) =>
+                  _buildDeviceCard(context, devices[index]),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildHeaderControls() {
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Sort By',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.sort),
+            ),
+            value: _selectedSortOption,
+            items: _sortOptions
+                .map((option) => DropdownMenuItem(
+                      value: option,
+                      child: Text(option),
+                    ))
+                .toList(),
+            onChanged: (newOption) {
+              if (newOption != null) {
+                setState(() => _selectedSortOption = newOption);
+              }
+            },
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          flex: 3,
+          child: DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Select Effect',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.filter_vintage_outlined),
+            ),
+            value: _selectedGlobalEffect.id,
+            items: widget.visualizerProvider.effects
+                .map((e) => DropdownMenuItem(
+                      value: e.id,
+                      child: Text(e.name),
+                    ))
+                .toList(),
+            onChanged: (newEffectId) {
+              if (newEffectId != null) {
+                setState(() => _selectedGlobalEffect =
+                    widget.visualizerProvider.effects
+                        .firstWhere((e) => e.id == newEffectId));
+                _applyGlobalEffect(newEffectId);
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeviceCard(BuildContext context, LedDevice device) {
+    return Dismissible(
+      key: ValueKey(device.name + device.ip + device.port.toString()),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) => _confirmDelete(context, device),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        color: Colors.redAccent,
+        child: const Icon(Icons.delete, color: Colors.white, size: 32),
+      ),
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        child: Padding(
+          padding: const EdgeInsets.all(18.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Device Info
+              Expanded(child: _buildDeviceDetails(context, device)),
+              const SizedBox(width: 12),
+              _buildDeviceControls(context, device),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeviceDetails(BuildContext context, LedDevice device) {
+    final theme = Theme.of(context).colorScheme;
+
+    Widget infoRow(IconData icon, String value) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: theme.outline),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                value,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: theme.outline),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.lightbulb, size: 16, color: theme.primary),
+            const SizedBox(width: 4),
+            Text(device.name,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        infoRow(Icons.lan, device.ip),
+        infoRow(Icons.wifi, 'PORT: ${device.port}'),
+        infoRow(Icons.linear_scale, 'LEDs: ${device.ledCount}'),
+        infoRow(Icons.category, device.type.displayName),
+      ],
+    );
+  }
+
+  Widget _buildDeviceControls(BuildContext context, LedDevice device) {
+    final effects = widget.visualizerProvider.effects;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 180,
+          height: 44,
+          child: DropdownButtonFormField<String>(
+            value: device.effect,
+            decoration: InputDecoration(
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+            ),
+            items: effects
+                .map((effect) => DropdownMenuItem(
+                      value: effect.id,
+                      child: Text(effect.name),
+                    ))
+                .toList(),
+            onChanged: (val) {
+              if (val != null) {
+                widget.visualizerProvider.deviceActions(
+                  context,
+                  [device.copyWith(effect: val)],
+                  DeviceAction.update,
+                );
+              }
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            FilledButton(
+              onPressed: () {
+                showDialog(
+                  barrierDismissible: false,
+                  useSafeArea: true,
+                  context: context,
+                  builder: (_) => Dialog(
+                    child: AddDevice(
+                      visualizerProvider: widget.visualizerProvider,
+                      device: device,
+                    ),
+                  ),
+                );
+              },
+              child: const Icon(Icons.edit_note, size: 26),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: () {
+                widget.visualizerProvider.deviceActions(
+                  context,
+                  [
+                    device.copyWith(isEnabled: !device.isEnabled),
+                  ],
+                  DeviceAction.update,
+                );
+              },
+              child: Icon(
+                device.isEnabled
+                    ? Icons.pause_circle_filled
+                    : Icons.play_circle_fill,
+                size: 26,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<bool> _confirmDelete(BuildContext context, LedDevice device) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Delete Device?'),
+            content: Text('Are you sure you want to delete "${device.name}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  widget.visualizerProvider.deviceActions(
+                    context,
+                    [device],
+                    DeviceAction.delete,
+                  );
+                  Navigator.of(context).pop(true);
+                },
+                child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 }

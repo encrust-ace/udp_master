@@ -13,301 +13,182 @@ class AddDevice extends StatefulWidget {
 }
 
 class _AddDeviceState extends State<AddDevice> {
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _numberOfLEDs = TextEditingController();
-  final TextEditingController _ipController = TextEditingController();
-  final TextEditingController _portController = TextEditingController(
-    text: '21324',
-  );
-  DeviceType _selectedDeviceType = DeviceType.wled;
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _ledCountController = TextEditingController();
+  final _ipController = TextEditingController();
+  final _portController = TextEditingController(text: '21324');
 
-  @override
-  void dispose() {
-    _ipController.dispose();
-    _numberOfLEDs.dispose();
-    super.dispose();
-  }
-
-  void _addDevice() async {
-    final ledCount = int.tryParse(_numberOfLEDs.text.trim()) ?? 0;
-    final name = _nameController.text.trim();
-    final ip = _ipController.text.trim();
-    final effects = widget.visualizerProvider.effects;
-
-    final device = LedDevice(
-      name: name,
-      ip: ip,
-      ledCount: ledCount,
-      effect: effects.first.id,
-      isEnabled: true,
-      type: _selectedDeviceType,
-      port: int.parse(_portController.text),
-    );
-    final resp = await widget.visualizerProvider.deviceActions(context, [
-      device,
-    ], DeviceAction.add);
-
-    if (!resp) return;
-    // Clear all fields except port and device type
-    setState(() {
-      _nameController.clear();
-      _ipController.clear();
-      _numberOfLEDs.clear();
-      // _portController remains unchanged
-      _selectedDeviceType = DeviceType.wled; // Reset to default
-    });
-    Navigator.of(context).pop();
-  }
+  DeviceType _selectedDeviceType = DeviceType.wled;
 
   @override
   void initState() {
-    if (widget.device != null) {
-      _nameController.text = widget.device!.name;
-      _ipController.text = widget.device!.ip;
-      _numberOfLEDs.text = widget.device!.ledCount.toString();
-      _portController.text = widget.device!.port.toString();
-      _selectedDeviceType = widget.device!.type;
-    }
     super.initState();
+    final d = widget.device;
+    if (d != null) {
+      _nameController.text = d.name;
+      _ipController.text = d.ip;
+      _ledCountController.text = d.ledCount.toString();
+      _portController.text = d.port.toString();
+      _selectedDeviceType = d.type;
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _ledCountController.dispose();
+    _ipController.dispose();
+    _portController.dispose();
+    super.dispose();
+  }
+
+  void _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    final device = LedDevice(
+      name: _nameController.text.trim(),
+      ip: _ipController.text.trim(),
+      ledCount: int.parse(_ledCountController.text.trim()),
+      effect: widget.visualizerProvider.effects.first.id,
+      isEnabled: true,
+      type: _selectedDeviceType,
+      port: int.parse(_portController.text.trim()),
+    );
+
+    final success = await widget.visualizerProvider.deviceActions(
+      context,
+      [device],
+      widget.device == null ? DeviceAction.add : DeviceAction.update,
+    );
+
+    if (success) Navigator.of(context).pop();
+  }
+
+  InputDecoration _inputDecoration(String label, IconData icon,
+      [String? hint]) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Icon(icon),
+      border: const OutlineInputBorder(),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(16),
       child: Form(
         key: _formKey,
         child: Column(
-          spacing: 20.0,
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch, // Make children take full width
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Import/Export buttons
             Row(
-              spacing: 16,
               children: [
                 ElevatedButton(
-                  onPressed: () {
-                    widget.visualizerProvider.importDevicesFromJsonFile(
-                      context,
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  child: Text("Import Devices"),
+                  onPressed: () => widget.visualizerProvider.importDevicesFromJsonFile(context),
+                  child: const Text("Import Devices"),
                 ),
+                const SizedBox(width: 12),
                 ElevatedButton(
-                  onPressed: () {
-                    widget.visualizerProvider.exportDevicesToJsonFile(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  child: Text("Export Devices"),
+                  onPressed: () => widget.visualizerProvider.exportDevicesToJsonFile(context),
+                  child: const Text("Export Devices"),
                 ),
-                SizedBox(width: 8),
-                // Text(
-                //   _visualizerProvider.castMode == CastMode.video
-                //       ? "Video"
-                //       : "Audio",
-                // ),
-                // Switch(
-                //   padding: EdgeInsets.only(right: 50),
-                //   value: _visualizerProvider.castMode == CastMode.video,
-                //   thumbColor: const WidgetStatePropertyAll<Color>(Colors.black),
-                //   onChanged: (bool value) {
-                //     if (value) {
-                //       _visualizerProvider.castMode = CastMode.video;
-                //     } else {
-                //       _visualizerProvider.castMode = CastMode.audio;
-                //     }
-                //   },
-                // ),
               ],
             ),
+            const SizedBox(height: 24),
 
+            // Name & LED count
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 8.0,
               children: [
                 Expanded(
                   flex: 3,
                   child: TextFormField(
                     controller: _nameController,
-                    decoration: InputDecoration(
-                      labelText: 'Name',
-                      hintText: 'Starcase',
-                      prefixIcon: const Icon(Icons.label),
-                      border: OutlineInputBorder(
-                        borderSide: const BorderSide(),
-                      ),
-                    ),
-                    keyboardType: TextInputType.text,
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Required'
-                        : null,
+                    decoration: _inputDecoration("Name", Icons.label, "Staircase"),
+                    validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
                   ),
                 ),
+                const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
                   child: TextFormField(
-                    controller: _numberOfLEDs,
-                    decoration: InputDecoration(
-                      labelText: 'LEDs',
-                      hintText: '90',
-                      prefixIcon: const Icon(Icons.light),
-                      border: OutlineInputBorder(
-                        borderSide: const BorderSide(),
-                      ),
-                    ),
+                    controller: _ledCountController,
+                    decoration: _inputDecoration("LEDs", Icons.light, "90"),
                     keyboardType: TextInputType.number,
                     validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Required';
-                      }
-                      final n = int.tryParse(value.trim());
-                      if (n == null || n <= 0) return 'Enter a valid number';
+                      final n = int.tryParse(value ?? '');
+                      if (n == null || n <= 0) return 'Enter valid count';
                       return null;
                     },
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
 
+            // IP & Port
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 8.0,
               children: [
                 Expanded(
                   flex: 3,
                   child: TextFormField(
                     controller: _ipController,
-                    decoration: InputDecoration(
-                      labelText: 'IP Address',
-                      hintText: '192.168.1.100',
-                      prefixIcon: const Icon(Icons.computer),
-                      border: OutlineInputBorder(
-                        borderSide: const BorderSide(),
-                      ),
-                    ),
-
-                    keyboardType: TextInputType.numberWithOptions(
-                      decimal: true,
-                      signed: false,
-                    ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Required'
-                        : null,
+                    decoration: _inputDecoration("IP Address", Icons.computer, "192.168.1.100"),
+                    keyboardType: TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
                   ),
                 ),
+                const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
                   child: TextFormField(
                     controller: _portController,
-                    enabled: true,
-                    decoration: InputDecoration(
-                      labelText: 'PORT',
-                      hintText: _portController.text,
-                      prefixIcon: const Icon(Icons.settings_ethernet),
-                      border: OutlineInputBorder(
-                        borderSide: const BorderSide(),
-                      ),
-                    ),
+                    decoration: _inputDecoration("Port", Icons.settings_ethernet),
                     keyboardType: TextInputType.number,
                     validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Required';
-                      }
-                      final n = int.tryParse(value.trim());
-                      if (n == null || n <= 0) return 'Enter a valid port';
+                      final n = int.tryParse(value ?? '');
+                      if (n == null || n <= 0) return 'Invalid port';
                       return null;
                     },
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
 
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: DropdownButtonFormField<DeviceType>(
-                    decoration: const InputDecoration(
-                      labelText: 'Device Type',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.merge_type),
-                    ),
-                    value: _selectedDeviceType,
-                    items: DeviceType.values
-                        .map(
-                          (type) => DropdownMenuItem(
-                            value: type,
-                            child: Text(type.displayName),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() => _selectedDeviceType = val);
-                      }
-                    },
-                    validator: (value) =>
-                        value == null ? 'Select device type' : null,
-                  ),
-                ),
-              ],
+            // Device Type
+            DropdownButtonFormField<DeviceType>(
+              decoration: _inputDecoration("Device Type", Icons.merge_type),
+              value: _selectedDeviceType,
+              items: DeviceType.values
+                  .map((type) => DropdownMenuItem(
+                        value: type,
+                        child: Text(type.displayName),
+                      ))
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) setState(() => _selectedDeviceType = val);
+              },
+              validator: (value) => value == null ? 'Select device type' : null,
             ),
-            SizedBox(height: 60),
+
+            const SizedBox(height: 32),
+
+            // Actions
             Row(
-              spacing: 16,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6.0),
-                      side: const BorderSide(),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 18.0,
-                      horizontal: 18.0,
-                    ),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  ),
+                OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
                   child: const Text("Cancel"),
                 ),
+                const SizedBox(width: 12),
                 ElevatedButton(
-                  onPressed: () {
-                    if (_formKey.currentState?.validate() ?? false) {
-                      _addDevice();
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6.0),
-                      side: const BorderSide(),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 18.0,
-                      horizontal: 18.0,
-                    ),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  ),
-                  child: Text(
-                    widget.device == null ? "Add Device" : "Update Device",
-                  ),
+                  onPressed: _submit,
+                  child: Text(widget.device == null ? "Add Device" : "Update Device"),
                 ),
               ],
             ),
