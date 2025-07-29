@@ -185,11 +185,13 @@ class _HomeState extends State<Home> {
           children: [
             Icon(Icons.lightbulb, size: 16, color: theme.primary),
             const SizedBox(width: 4),
-            Text(device.name,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold)),
+            Flexible(
+              child: Text(device.name,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+            ),
           ],
         ),
         const SizedBox(height: 8),
