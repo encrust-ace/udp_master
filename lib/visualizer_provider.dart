@@ -238,46 +238,46 @@ class VisualizerProvider with ChangeNotifier {
         }
       }
     }
-    // For simulators - update the 'packets' variable
+  }
 
-    if (targetDevices.isNotEmpty) {
-      final device = targetDevices.first; // Assuming first device for simulator
-      LedEffect effect = getEffectById(device.effect);
-      late List<int> packetData;
-      switch (effect.id) {
-        case 'volume-bars':
-          packetData = renderVerticalBars(
-            device: device,
-            fft: fft,
-            gain: effect.parameters["gain"]?["value"] ?? 2.0,
-            brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-            saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-          );
-          break;
-        case 'center-pulse':
-          packetData = renderCenterPulsePacket(
-            device: device,
-            fft: fft,
-            gain: effect.parameters["gain"]?["value"] ?? 2.0,
-          );
-          break;
-        case 'music-rhythm':
-          packetData = renderBeatDropEffect(
-            device: device,
-            fft: fft,
-            gain: effect.parameters["gain"]?["value"] ?? 2.0,
-            brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-            saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-            raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 10.0,
-            decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 1.0,
-            dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
-          );
-          break;
-        default:
-          packetData = []; // Or some default empty/error state
-      }
-      packets = packetData;
+  Future<void> simulatorPageData(LedDevice device, Float32List fft) async {
+    // For simulators - update the 'packets' variable
+    LedEffect effect = getEffectById(device.effect);
+    late List<int> packetData;
+    switch (effect.id) {
+      case 'volume-bars':
+        packetData = renderVerticalBars(
+          device: device,
+          fft: fft,
+          gain: effect.parameters["gain"]?["value"] ?? 2.0,
+          brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+          saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+        );
+        break;
+      case 'center-pulse':
+        packetData = renderCenterPulsePacket(
+          device: device,
+          fft: fft,
+          gain: effect.parameters["gain"]?["value"] ?? 2.0,
+        );
+        break;
+      case 'music-rhythm':
+        packetData = renderBeatDropEffect(
+          device: device,
+          fft: fft,
+          gain: effect.parameters["gain"]?["value"] ?? 2.0,
+          brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+          saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+          raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 10.0,
+          decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 1.0,
+          dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
+        );
+        break;
+      default:
+        packetData = []; // Or some default empty/error state
     }
+    packets = packetData;
+    notifyListeners(); // Notify listeners to update UI or other parts
   }
 
   // --- Device Management ---
@@ -519,6 +519,9 @@ class VisualizerProvider with ChangeNotifier {
               .toList(),
           fft: Float32List.fromList(doubleSamples),
         );
+        if (_currentSelectedTab == 2) {
+          simulatorPageData(_devices[0], Float32List.fromList(doubleSamples));
+        }
       },
       onError: (error) {
         if (kDebugMode) {
@@ -558,6 +561,9 @@ class VisualizerProvider with ChangeNotifier {
           targetDevices: _devices.where((d) => d.isEffectEnabled).toList(),
           fft: fft,
         );
+        if (_currentSelectedTab == 2) {
+          simulatorPageData(_devices[0], fft);
+        }
       });
     } catch (e) {
       if (kDebugMode) {
