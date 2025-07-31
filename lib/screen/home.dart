@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/screen/add_device.dart';
+import 'package:udp_master/screen/device_details.dart';
+import 'package:udp_master/screen/wiz_screen.dart';
 import 'package:udp_master/visualizer_provider.dart';
 
 class Home extends StatefulWidget {
@@ -30,7 +32,7 @@ class _HomeState extends State<Home> {
     widget.visualizerProvider.deviceActions(
       context,
       updatedDevices,
-      DeviceAction.update,
+      DeviceAction.addOrUpdate,
     );
   }
 
@@ -81,10 +83,10 @@ class _HomeState extends State<Home> {
             ),
             value: _selectedSortOption,
             items: _sortOptions
-                .map((option) => DropdownMenuItem(
-                      value: option,
-                      child: Text(option),
-                    ))
+                .map(
+                  (option) =>
+                      DropdownMenuItem(value: option, child: Text(option)),
+                )
                 .toList(),
             onChanged: (newOption) {
               if (newOption != null) {
@@ -104,16 +106,16 @@ class _HomeState extends State<Home> {
             ),
             value: _selectedGlobalEffect.id,
             items: widget.visualizerProvider.effects
-                .map((e) => DropdownMenuItem(
-                      value: e.id,
-                      child: Text(e.name),
-                    ))
+                .map((e) => DropdownMenuItem(value: e.id, child: Text(e.name)))
                 .toList(),
             onChanged: (newEffectId) {
               if (newEffectId != null) {
-                setState(() => _selectedGlobalEffect =
-                    widget.visualizerProvider.effects
-                        .firstWhere((e) => e.id == newEffectId));
+                setState(
+                  () => _selectedGlobalEffect = widget
+                      .visualizerProvider
+                      .effects
+                      .firstWhere((e) => e.id == newEffectId),
+                );
                 _applyGlobalEffect(newEffectId);
               }
             },
@@ -134,20 +136,31 @@ class _HomeState extends State<Home> {
         color: Colors.redAccent,
         child: const Icon(Icons.delete, color: Colors.white, size: 32),
       ),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        child: Padding(
-          padding: const EdgeInsets.all(18.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Device Info
-              Expanded(child: _buildDeviceDetails(context, device)),
-              const SizedBox(width: 12),
-              _buildDeviceControls(context, device),
-            ],
+      child: GestureDetector(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => device.type == DeviceType.wiz
+                  ? DeviceControlScreen(device: device)
+                  : DeviceDetails(device: device),
+            ),
+          );
+        },
+        child: Card(
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: Padding(
+            padding: const EdgeInsets.all(18.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Device Info
+                Expanded(child: _buildDeviceDetails(context, device)),
+                const SizedBox(width: 12),
+                _buildDeviceControls(context, device),
+              ],
+            ),
           ),
         ),
       ),
@@ -167,10 +180,9 @@ class _HomeState extends State<Home> {
             Flexible(
               child: Text(
                 value,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: theme.outline),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: theme.outline),
               ),
             ),
           ],
@@ -186,11 +198,12 @@ class _HomeState extends State<Home> {
             Icon(Icons.lightbulb, size: 16, color: theme.primary),
             const SizedBox(width: 4),
             Flexible(
-              child: Text(device.name,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+              child: Text(
+                device.name,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
@@ -214,24 +227,28 @@ class _HomeState extends State<Home> {
           child: DropdownButtonFormField<String>(
             value: device.effect,
             decoration: InputDecoration(
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
               isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 12,
+                horizontal: 12,
+              ),
             ),
             items: effects
-                .map((effect) => DropdownMenuItem(
-                      value: effect.id,
-                      child: Text(effect.name),
-                    ))
+                .map(
+                  (effect) => DropdownMenuItem(
+                    value: effect.id,
+                    child: Text(effect.name),
+                  ),
+                )
                 .toList(),
             onChanged: (val) {
               if (val != null) {
-                widget.visualizerProvider.deviceActions(
-                  context,
-                  [device.copyWith(effect: val)],
-                  DeviceAction.update,
-                );
+                widget.visualizerProvider.deviceActions(context, [
+                  device.copyWith(effect: val),
+                ], DeviceAction.addOrUpdate);
               }
             },
           ),
@@ -258,16 +275,12 @@ class _HomeState extends State<Home> {
             const SizedBox(width: 8),
             FilledButton(
               onPressed: () {
-                widget.visualizerProvider.deviceActions(
-                  context,
-                  [
-                    device.copyWith(isEnabled: !device.isEnabled),
-                  ],
-                  DeviceAction.update,
-                );
+                widget.visualizerProvider.deviceActions(context, [
+                  device.copyWith(isEffectEnabled: !device.isEffectEnabled),
+                ], DeviceAction.addOrUpdate);
               },
               child: Icon(
-                device.isEnabled
+                device.isEffectEnabled
                     ? Icons.pause_circle_filled
                     : Icons.play_circle_fill,
                 size: 26,
@@ -292,14 +305,15 @@ class _HomeState extends State<Home> {
               ),
               TextButton(
                 onPressed: () {
-                  widget.visualizerProvider.deviceActions(
-                    context,
-                    [device],
-                    DeviceAction.delete,
-                  );
+                  widget.visualizerProvider.deviceActions(context, [
+                    device,
+                  ], DeviceAction.delete);
                   Navigator.of(context).pop(true);
                 },
-                child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
               ),
             ],
           ),

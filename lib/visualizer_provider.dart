@@ -14,20 +14,22 @@ import 'package:udp_master/effects/center_pulse.dart';
 import 'package:udp_master/effects/music_rhythm.dart';
 import 'package:udp_master/effects/volume_bars.dart';
 import 'package:udp_master/models.dart';
+import 'package:udp_master/udp_sender.dart';
 
-typedef EffectRenderFunction = List<int> Function({
-  required int ledCount,
-  required Float32List fft,
-  double gain,
-  // required double hue,
-});
+typedef EffectRenderFunction =
+    List<int> Function({
+      required int ledCount,
+      required Float32List fft,
+      double gain,
+      // required double hue,
+    });
 
 const MethodChannel _platform = MethodChannel("mic_channel");
 const EventChannel _micStreamChannel = EventChannel('mic_stream');
 
 class VisualizerProvider with ChangeNotifier {
   static final VisualizerProvider _instance = VisualizerProvider._internal();
-
+  final UdpSender _udpSender = UdpSender();
   factory VisualizerProvider() {
     return _instance;
   }
@@ -62,7 +64,6 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   StreamSubscription? _micSubscription;
-  UDP? _udpSender; // Persistent UDP sender
 
   List<LedDevice> _devices = [];
   UnmodifiableListView<LedDevice> get devices => UnmodifiableListView(_devices);
@@ -105,8 +106,10 @@ class VisualizerProvider with ChangeNotifier {
 
   LedEffect getEffectById(String id) {
     try {
-      return _effects.firstWhere((effect) => effect.id == id,
-          orElse: () => _effects.first);
+      return _effects.firstWhere(
+        (effect) => effect.id == id,
+        orElse: () => _effects.first,
+      );
     } catch (_) {
       // Should ideally not happen if _effects is never empty and first is valid
       return _effects.first;
@@ -127,8 +130,9 @@ class VisualizerProvider with ChangeNotifier {
       parameters: {...effect.parameters, key: parameter},
     );
     final prefs = await SharedPreferences.getInstance();
-    final effectList =
-        existingEffects.map((e) => json.encode(e.toJson())).toList();
+    final effectList = existingEffects
+        .map((e) => json.encode(e.toJson()))
+        .toList();
     await prefs.setStringList('effects', effectList);
     notifyListeners();
     _effects = existingEffects;
@@ -139,7 +143,7 @@ class VisualizerProvider with ChangeNotifier {
     required List<LedDevice> targetDevices,
     required Float32List fft,
   }) async {
-    if (_udpSender == null) {
+    if (_udpSender.udpInstance == null) {
       if (kDebugMode) {
         print("VisualizerService: UDP sender not initialized.");
       }
@@ -147,8 +151,6 @@ class VisualizerProvider with ChangeNotifier {
     }
 
     for (var device in targetDevices) {
-      if (!device.isEnabled) continue;
-
       final target = Endpoint.unicast(
         InternetAddress(device.ip),
         port: Port(device.port),
@@ -191,7 +193,7 @@ class VisualizerProvider with ChangeNotifier {
               continue;
           }
           if (packetData.isNotEmpty) {
-            _udpSender?.send(packetData, target);
+            _udpSender.udpInstance?.send(packetData, target);
           }
         } else if (device.type == DeviceType.wiz) {
           LedEffect effect = getEffectById(device.effect);
@@ -218,7 +220,7 @@ class VisualizerProvider with ChangeNotifier {
           final data = {
             "method": "setPilot",
             "params": {
-              "state": brightness > 20,
+              "state": true,
               "r": r.clamp(0, 255),
               "g": g.clamp(0, 255),
               "b": b.clamp(0, 255),
@@ -227,7 +229,7 @@ class VisualizerProvider with ChangeNotifier {
           };
 
           final message = utf8.encode(jsonEncode(data));
-          _udpSender?.send(message, target);
+          _udpSender.udpInstance?.send(message, target);
         }
       } catch (e) {
         if (kDebugMode) {
@@ -236,11 +238,9 @@ class VisualizerProvider with ChangeNotifier {
       }
     }
     // For simulators - update the 'packets' variable
-    // This is decoupled from the actual UDP send loop to prevent UI jank.
-    // If a simulator view needs to reflect this, it should listen to
-    // a throttled stream or compute its own rendering.
-    if (_devices.isNotEmpty) {
-      final device = _devices.first; // Assuming first device for simulator
+
+    if (targetDevices.isNotEmpty) {
+      final device = targetDevices.first; // Assuming first device for simulator
       LedEffect effect = getEffectById(device.effect);
       late List<int> packetData;
       switch (effect.id) {
@@ -275,10 +275,6 @@ class VisualizerProvider with ChangeNotifier {
         default:
           packetData = []; // Or some default empty/error state
       }
-      // Update packets for simulator, but DO NOT call notifyListeners() here
-      // unless you have a mechanism to throttle it significantly.
-      // If a UI element depends on `packets`, it should have its own ValueNotifier.
-      // For general performance, this `packets` variable is primarily for inspection.
       packets = packetData;
     }
   }
@@ -293,6 +289,7 @@ class VisualizerProvider with ChangeNotifier {
         .toList();
     final currectSelectedTab = prefs.getInt('currentSelectedTab') ?? 0;
     _currentSelectedTab = currectSelectedTab;
+    _udpSender.initiateUDPSender();
     notifyListeners();
   }
 
@@ -303,23 +300,15 @@ class VisualizerProvider with ChangeNotifier {
   ) async {
     try {
       switch (action) {
-        case DeviceAction.add:
+        case DeviceAction.addOrUpdate:
           for (LedDevice device in devices) {
             // Check for duplicate (by name or IP)
-            final int index = _devices.indexWhere((d) => d.ip == device.ip);
+            final int index = _devices.indexWhere((d) => d.id == device.id);
             if (index != -1) {
               _devices[index] = device;
               continue;
             } else {
               _devices.add(device);
-            }
-          }
-          break;
-        case DeviceAction.update:
-          for (LedDevice device in devices) {
-            int index = _devices.indexWhere((d) => d.ip == device.ip);
-            if (index != -1) {
-              _devices[index] = device;
             }
           }
           break;
@@ -438,10 +427,11 @@ class VisualizerProvider with ChangeNotifier {
       final List<dynamic> decodedList = jsonDecode(
         jsonString,
       ); // This is List<dynamic>
-      final List<LedDevice> importedDevices =
-          decodedList.map((e) => LedDevice.fromJson(e)).toList();
+      final List<LedDevice> importedDevices = decodedList
+          .map((e) => LedDevice.fromJson(e))
+          .toList();
 
-      deviceActions(context, importedDevices, DeviceAction.add);
+      deviceActions(context, importedDevices, DeviceAction.addOrUpdate);
     }
   }
 
@@ -465,15 +455,6 @@ class VisualizerProvider with ChangeNotifier {
       return false;
     }
 
-    try {
-      _udpSender = await UDP.bind(Endpoint.any()); // Initialize UDP sender
-    } catch (e) {
-      if (kDebugMode) {
-        print("VisualizerService: Failed to bind UDP sender: $e");
-      }
-      return false; // Cannot start without UDP
-    }
-
     if (Platform.isLinux) {
       await _startMicLinux();
     } else {
@@ -486,7 +467,11 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   Future<void> _stopVisualizer() async {
-    if (!_isRunning && _micSubscription == null && _udpSender == null) return;
+    if (!_isRunning &&
+        _micSubscription == null &&
+        _udpSender.udpInstance == null) {
+      return;
+    }
 
     if (Platform.isLinux) {
       _recorder.stopStreamingData();
@@ -496,9 +481,6 @@ class VisualizerProvider with ChangeNotifier {
       _micSubscription = null;
       await _platform.invokeMethod("stopMic");
     }
-
-    _udpSender?.close(); // Close the UDP sender
-    _udpSender = null; // Clear the reference
 
     _isRunning = false;
     notifyListeners();
@@ -531,7 +513,9 @@ class VisualizerProvider with ChangeNotifier {
           return;
         }
         sendUdpToDevices(
-          targetDevices: _devices.where((d) => d.isEnabled).toList(),
+          targetDevices: _devices
+              .where((d) => d.isEffectEnabled == true)
+              .toList(),
           fft: Float32List.fromList(doubleSamples),
         );
       },
@@ -570,7 +554,7 @@ class VisualizerProvider with ChangeNotifier {
         final Float32List fft = _recorder.getFft();
 
         sendUdpToDevices(
-          targetDevices: _devices.where((d) => d.isEnabled).toList(),
+          targetDevices: _devices.where((d) => d.isEffectEnabled).toList(),
           fft: fft,
         );
       });

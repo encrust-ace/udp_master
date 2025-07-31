@@ -47,11 +47,12 @@ class _AddDeviceState extends State<AddDevice> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final device = LedDevice(
+      id: widget.device?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
       name: _nameController.text.trim(),
       ip: _ipController.text.trim(),
       ledCount: int.parse(_ledCountController.text.trim()),
       effect: widget.visualizerProvider.effects.first.id,
-      isEnabled: true,
+      isEffectEnabled: widget.device?.isEffectEnabled ?? true,
       type: _selectedDeviceType,
       port: int.parse(_portController.text.trim()),
     );
@@ -59,7 +60,7 @@ class _AddDeviceState extends State<AddDevice> {
     final success = await widget.visualizerProvider.deviceActions(
       context,
       [device],
-      widget.device == null ? DeviceAction.add : DeviceAction.update,
+      DeviceAction.addOrUpdate,
     );
 
     if (success) Navigator.of(context).pop();
