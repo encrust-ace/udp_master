@@ -157,7 +157,8 @@ class VisualizerProvider with ChangeNotifier {
       );
 
       try {
-        if (device.type == DeviceType.wled) {
+        if (device.type == DeviceType.wled ||
+            device.type == DeviceType.esphome) {
           LedEffect effect = getEffectById(device.effect);
           late List<int> packetData;
           switch (effect.id) {
@@ -165,7 +166,7 @@ class VisualizerProvider with ChangeNotifier {
               packetData = renderVerticalBars(
                 device: device,
                 fft: fft,
-                gain: effect.parameters["gain"]?["value"] ?? 1.0,
+                gain: effect.parameters["gain"]?["value"] ?? 2.0,
                 brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
                 saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
               );
@@ -174,7 +175,7 @@ class VisualizerProvider with ChangeNotifier {
               packetData = renderCenterPulsePacket(
                 device: device,
                 fft: fft,
-                gain: effect.parameters["gain"]?["value"] ?? 1.0,
+                gain: effect.parameters["gain"]?["value"] ?? 2.0,
               );
               break;
             case 'music-rhythm':
@@ -220,7 +221,7 @@ class VisualizerProvider with ChangeNotifier {
           final data = {
             "method": "setPilot",
             "params": {
-              "state": true,
+              "state": brightness > 10,
               "r": r.clamp(0, 255),
               "g": g.clamp(0, 255),
               "b": b.clamp(0, 255),
