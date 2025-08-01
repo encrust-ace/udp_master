@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:udp_master/models.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 class DeviceDetails extends StatefulWidget {
   final LedDevice device;
@@ -11,26 +11,32 @@ class DeviceDetails extends StatefulWidget {
 }
 
 class _DeviceDetailsState extends State<DeviceDetails> {
-  WebViewController _controller = WebViewController();
-  void _initializeWebView() {
-    // Initialize the WebView controller here if needed
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(NavigationDelegate())
-      ..loadRequest(Uri.parse('http://${widget.device.ip}'));
-  }
+  InAppWebViewController? webViewController;
+  String url = "";
 
   @override
   void initState() {
-    _initializeWebView();
+    url = 'http://${widget.device.ip}';
+    //' widget.device.ip;
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Device Details')),
-      body: WebViewWidget(controller: _controller),
+      appBar: AppBar(title: Text('Web View')),
+      body: InAppWebView(
+        initialUrlRequest: URLRequest(url: WebUri(url)),
+        onWebViewCreated: (controller) {
+          webViewController = controller;
+        },
+        onLoadStart: (controller, url) {
+          print("Started loading: $url");
+        },
+        onLoadStop: (controller, url) {
+          print("Finished loading: $url");
+        },
+      ),
     );
   }
 }
