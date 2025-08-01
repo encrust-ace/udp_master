@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:udp_master/models.dart';
@@ -31,10 +32,14 @@ class _DeviceDetailsState extends State<DeviceDetails> {
           webViewController = controller;
         },
         onLoadStart: (controller, url) {
-          print("Started loading: $url");
+          if (kDebugMode) {
+            print("Started loading: $url");
+          }
         },
         onLoadStop: (controller, url) {
-          print("Finished loading: $url");
+          if (kDebugMode) {
+            print("Finished loading: $url");
+          }
         },
       ),
     );
