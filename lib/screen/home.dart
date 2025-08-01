@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/screen/add_device.dart';
 import 'package:udp_master/screen/device_details.dart';
 import 'package:udp_master/screen/wiz_screen.dart';
 import 'package:udp_master/visualizer_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class Home extends StatefulWidget {
   final VisualizerProvider visualizerProvider;
@@ -23,6 +26,13 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     _selectedGlobalEffect = widget.visualizerProvider.effects.first;
+  }
+
+  Future<void> _launchUrl(LedDevice device) async {
+    final Uri uri = Uri.parse('http://${device.ip}');
+    if (!await launchUrl(uri)) {
+      throw Exception('Could not launch $uri');
+    }
   }
 
   void _applyGlobalEffect(String effectId) {
@@ -138,13 +148,23 @@ class _HomeState extends State<Home> {
       ),
       child: GestureDetector(
         onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => device.type == DeviceType.wiz
-                  ? DeviceControlScreen(device: device)
-                  : DeviceDetails(device: device),
-            ),
-          );
+          if (device.type == DeviceType.wiz) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => DeviceControlScreen(device: device),
+              ),
+            );
+          } else {
+            if (Platform.isAndroid || Platform.isIOS) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DeviceDetails(device: device),
+                ),
+              );
+            } else {
+              _launchUrl(device);
+            }
+          }
         },
         child: Card(
           elevation: 4,
