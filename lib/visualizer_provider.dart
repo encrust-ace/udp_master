@@ -294,48 +294,43 @@ class VisualizerProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> deviceActions(
-    BuildContext context,
-    List<LedDevice> devices,
-    DeviceAction action,
-  ) async {
+  Future<void> _saveDevices() async {
+    final prefs = await SharedPreferences.getInstance();
+    final deviceList = _devices.map((device) => json.encode(device.toJson())).toList();
+    await prefs.setStringList('devices', deviceList);
+    notifyListeners(); // Only notify when device list actually changes
+  }
+
+  Future<String> deviceActions(LedDevice device, DeviceAction action) async {
     try {
       switch (action) {
-        case DeviceAction.addOrUpdate:
-          for (LedDevice device in devices) {
-            // Check for duplicate (by name or IP)
-            final int index = _devices.indexWhere((d) => d.id == device.id);
-            if (index != -1) {
-              _devices[index] = device;
-              continue;
-            } else {
-              _devices.add(device);
-            }
+        case DeviceAction.add:
+          // Check for duplicate (by name or IP)
+          final int index = _devices.indexWhere((d) => d.ip == device.ip);
+          if (index != -1) {
+            _devices[index] = device;
+            return "Device already exists";
+          } else {
+            _devices.add(device);
+            await _saveDevices();
+            return "Device added successfully";
           }
-          break;
+        case DeviceAction.update:
+          final int index = _devices.indexWhere((d) => d.id == device.id);
+          if (index != -1) {
+            _devices[index] = device;
+            await _saveDevices();
+            return "Device updated successfully";
+          } else {
+            return "Device not found, cannot update";
+          }
         case DeviceAction.delete:
-          for (LedDevice device in devices) {
-            _devices.removeWhere((d) => d.ip == device.ip);
-          }
-          break;
+          _devices.removeWhere((d) => d.id == device.id);
+          await _saveDevices();
+          return "Device deleted successfully";
       }
-      final prefs = await SharedPreferences.getInstance();
-      final deviceList = _devices.map((e) => json.encode(e.toJson())).toList();
-      await prefs.setStringList('devices', deviceList);
-      notifyListeners(); // Only notify when device list actually changes
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Device list updated successfully!')),
-        );
-      }
-      return true;
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
-      return false;
+      return "Error: $e";
     }
   }
 
@@ -403,7 +398,7 @@ class VisualizerProvider with ChangeNotifier {
     }
   }
 
-  Future<void> importDevicesFromJsonFile(BuildContext context) async {
+  Future<String> importDevicesFromJsonFile() async {
     final result = await FilePicker.platform.pickFiles(
       dialogTitle: "Select Devices JSON File",
       type: FileType.custom,
@@ -414,14 +409,7 @@ class VisualizerProvider with ChangeNotifier {
     if (result == null ||
         result.files.isEmpty ||
         result.files.single.bytes == null) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('File is incorrect!'),
-            backgroundColor: Colors.deepOrange,
-          ),
-        );
-      }
+      return "File selection canceled or no data found.";
     } else {
       final bytes = result.files.single.bytes!;
       final jsonString = utf8.decode(bytes);
@@ -432,7 +420,19 @@ class VisualizerProvider with ChangeNotifier {
           .map((e) => LedDevice.fromJson(e))
           .toList();
 
-      deviceActions(context, importedDevices, DeviceAction.addOrUpdate);
+      final List<LedDevice> finalList = _devices;
+      for (var device in importedDevices) {
+        final existingIndex = _devices.indexWhere((d) => d.ip == device.ip);
+        if (existingIndex != -1) {
+          // Update existing device
+          _devices[existingIndex] = device;
+        } else {
+          // Add new device
+          finalList.add(device);
+        }
+      }
+      await _saveDevices();
+      return "Devices imported successfully!";
     }
   }
 

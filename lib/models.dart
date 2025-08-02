@@ -1,24 +1,17 @@
 enum CastMode { audio, video }
 
-enum DeviceAction { addOrUpdate, delete }
+enum DeviceAction { add, update, delete }
 
-enum DeviceType { wled, esphome, udp, wiz, tuya }
+enum DeviceType {
+  wled('Wled', 21324),
+  esphome('ESP Home', 21324),
+  udp('UDP', 21324),
+  wiz('Wiz', 38899),
+  tuya('Tuya', 21324);
 
-extension DeviceTypeExtension on DeviceType {
-  String get displayName {
-    switch (this) {
-      case DeviceType.wled:
-        return 'Wled';
-      case DeviceType.esphome:
-        return 'ESP Home';
-      case DeviceType.udp:
-        return 'UDP';
-      case DeviceType.wiz:
-        return 'Wiz';
-      case DeviceType.tuya:
-        return 'Tuya';
-    }
-  }
+  const DeviceType(this.name, this.port);
+  final String name;
+  final int port;
 }
 
 class LedDevice {
@@ -84,7 +77,7 @@ class LedDevice {
       ledCount: json['ledCount'],
       effect: json['effect'],
       isEffectEnabled: json['isEffectEnabled'],
-      type: DeviceType.values.firstWhere((e) => e.name == json['type']),
+      type: DeviceType.values.firstWhere((type) => type.name == json['type']),
     );
   }
 }

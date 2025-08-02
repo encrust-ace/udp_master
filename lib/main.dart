@@ -4,6 +4,7 @@ import 'package:udp_master/screen/add_device.dart';
 import 'package:udp_master/screen/effects.dart';
 import 'package:udp_master/screen/home.dart';
 import 'package:udp_master/screen/simulator_page.dart';
+import 'package:udp_master/services/discover.dart';
 
 import 'visualizer_provider.dart';
 
@@ -46,8 +47,10 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInitialDependenciesMet) {
-      _visualizerProvider =
-          Provider.of<VisualizerProvider>(context, listen: false);
+      _visualizerProvider = Provider.of<VisualizerProvider>(
+        context,
+        listen: false,
+      );
       _visualizerProvider.initiateTheAppData();
       _isInitialDependenciesMet = true;
     }
@@ -58,9 +61,8 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
       barrierDismissible: false,
       useSafeArea: true,
       context: context,
-      builder: (_) => Dialog(
-        child: AddDevice(visualizerProvider: _visualizerProvider),
-      ),
+      builder: (_) =>
+          Dialog(child: AddDevice(visualizerProvider: _visualizerProvider)),
     );
   }
 
@@ -70,6 +72,17 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
       appBar: AppBar(
         title: const Icon(Icons.lightbulb, size: 36),
         actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const WizBulbDiscoveryPage(),
+                ),
+              );
+            },
+            icon: Icon(Icons.search),
+          ),
           IconButton(
             onPressed: () => _showAddDeviceDialog(context),
             icon: const Icon(Icons.add, size: 36),

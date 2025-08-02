@@ -39,11 +39,10 @@ class _HomeState extends State<Home> {
     final updatedDevices = widget.visualizerProvider.devices
         .map((d) => d.copyWith(effect: effectId))
         .toList();
-    widget.visualizerProvider.deviceActions(
-      context,
-      updatedDevices,
-      DeviceAction.addOrUpdate,
-    );
+
+    for (var device in updatedDevices) {
+      widget.visualizerProvider.deviceActions(device, DeviceAction.update);
+    }
   }
 
   List<LedDevice> _getSortedDevices() {
@@ -231,7 +230,7 @@ class _HomeState extends State<Home> {
         infoRow(Icons.lan, device.ip),
         infoRow(Icons.wifi, 'PORT: ${device.port}'),
         infoRow(Icons.linear_scale, 'LEDs: ${device.ledCount}'),
-        infoRow(Icons.category, device.type.displayName),
+        infoRow(Icons.category, device.type.name),
       ],
     );
   }
@@ -266,9 +265,10 @@ class _HomeState extends State<Home> {
                 .toList(),
             onChanged: (val) {
               if (val != null) {
-                widget.visualizerProvider.deviceActions(context, [
+                widget.visualizerProvider.deviceActions(
                   device.copyWith(effect: val),
-                ], DeviceAction.addOrUpdate);
+                  DeviceAction.update,
+                );
               }
             },
           ),
@@ -295,9 +295,10 @@ class _HomeState extends State<Home> {
             const SizedBox(width: 8),
             FilledButton(
               onPressed: () {
-                widget.visualizerProvider.deviceActions(context, [
+                widget.visualizerProvider.deviceActions(
                   device.copyWith(isEffectEnabled: !device.isEffectEnabled),
-                ], DeviceAction.addOrUpdate);
+                  DeviceAction.update,
+                );
               },
               child: Icon(
                 device.isEffectEnabled
@@ -325,9 +326,10 @@ class _HomeState extends State<Home> {
               ),
               TextButton(
                 onPressed: () {
-                  widget.visualizerProvider.deviceActions(context, [
+                  widget.visualizerProvider.deviceActions(
                     device,
-                  ], DeviceAction.delete);
+                    DeviceAction.delete,
+                  );
                   Navigator.of(context).pop(true);
                 },
                 child: const Text(

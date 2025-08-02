@@ -57,17 +57,25 @@ class _AddDeviceState extends State<AddDevice> {
       port: int.parse(_portController.text.trim()),
     );
 
-    final success = await widget.visualizerProvider.deviceActions(
-      context,
-      [device],
-      DeviceAction.addOrUpdate,
+    final message = await widget.visualizerProvider.deviceActions(
+      device,
+      widget.device == null ? DeviceAction.add : DeviceAction.update,
     );
 
-    if (success) Navigator.of(context).pop();
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+
+    if (message.contains("successfully")) {
+      Navigator.of(context).pop();
+    }
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon,
-      [String? hint]) {
+  InputDecoration _inputDecoration(
+    String label,
+    IconData icon, [
+    String? hint,
+  ]) {
     return InputDecoration(
       labelText: label,
       hintText: hint,
@@ -89,12 +97,14 @@ class _AddDeviceState extends State<AddDevice> {
             Row(
               children: [
                 ElevatedButton(
-                  onPressed: () => widget.visualizerProvider.importDevicesFromJsonFile(context),
+                  onPressed: () =>
+                      widget.visualizerProvider.importDevicesFromJsonFile(),
                   child: const Text("Import Devices"),
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton(
-                  onPressed: () => widget.visualizerProvider.exportDevicesToJsonFile(context),
+                  onPressed: () => widget.visualizerProvider
+                      .exportDevicesToJsonFile(context),
                   child: const Text("Export Devices"),
                 ),
               ],
@@ -108,8 +118,14 @@ class _AddDeviceState extends State<AddDevice> {
                   flex: 3,
                   child: TextFormField(
                     controller: _nameController,
-                    decoration: _inputDecoration("Name", Icons.label, "Staircase"),
-                    validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+                    decoration: _inputDecoration(
+                      "Name",
+                      Icons.label,
+                      "Staircase",
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Required'
+                        : null,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -137,9 +153,17 @@ class _AddDeviceState extends State<AddDevice> {
                   flex: 3,
                   child: TextFormField(
                     controller: _ipController,
-                    decoration: _inputDecoration("IP Address", Icons.computer, "192.168.1.100"),
-                    keyboardType: TextInputType.numberWithOptions(decimal: true),
-                    validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+                    decoration: _inputDecoration(
+                      "IP Address",
+                      Icons.computer,
+                      "192.168.1.100",
+                    ),
+                    keyboardType: TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Required'
+                        : null,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -147,7 +171,10 @@ class _AddDeviceState extends State<AddDevice> {
                   flex: 2,
                   child: TextFormField(
                     controller: _portController,
-                    decoration: _inputDecoration("Port", Icons.settings_ethernet),
+                    decoration: _inputDecoration(
+                      "Port",
+                      Icons.settings_ethernet,
+                    ),
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       final n = int.tryParse(value ?? '');
@@ -165,10 +192,12 @@ class _AddDeviceState extends State<AddDevice> {
               decoration: _inputDecoration("Device Type", Icons.merge_type),
               value: _selectedDeviceType,
               items: DeviceType.values
-                  .map((type) => DropdownMenuItem(
-                        value: type,
-                        child: Text(type.displayName),
-                      ))
+                  .map(
+                    (type) => DropdownMenuItem(
+                      value: type,
+                      child: Text(type.name),
+                    ),
+                  )
                   .toList(),
               onChanged: (val) {
                 if (val != null) setState(() => _selectedDeviceType = val);
@@ -189,7 +218,9 @@ class _AddDeviceState extends State<AddDevice> {
                 const SizedBox(width: 12),
                 ElevatedButton(
                   onPressed: _submit,
-                  child: Text(widget.device == null ? "Add Device" : "Update Device"),
+                  child: Text(
+                    widget.device == null ? "Add Device" : "Update Device",
+                  ),
                 ),
               ],
             ),
