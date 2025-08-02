@@ -306,7 +306,7 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
         child: AddDevice(
           visualizerProvider: widget.visualizerProvider,
           device: LedDevice(
-            id: '',
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
             name: device.name ?? 'Unknown',
             ip: device.ip,
             port: device.port,
@@ -328,7 +328,7 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          spacing: 8,
+          spacing: 16,
           children: [
             Row(
               spacing: 8,
@@ -368,22 +368,18 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                 ElevatedButton(
                   onPressed: isScanning ? null : _scanForDevices,
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.all(16),
-                    textStyle: const TextStyle(fontSize: 16),
+                    fixedSize: Size(44, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
-                  child: Row(
-                    spacing: 4,
-                    children: [
-                      isScanning
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.search),
-                      Text(isScanning ? 'Scanning...' : 'Scan for devices'),
-                    ],
-                  ),
+                  child: isScanning
+                      ? SizedBox(
+                          height: 12,
+                          width: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.search),
                 ),
               ],
             ),
@@ -394,9 +390,9 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Row(
+                    spacing: 8,
                     children: [
                       Icon(Icons.error, color: Colors.red.shade700),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           errorMessage!,
@@ -410,6 +406,7 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
             // Results Header
             if (discoveredDevices.isNotEmpty) ...[
               Row(
+                spacing: 8,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
@@ -423,6 +420,11 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                     onPressed: _clearResults,
                     icon: const Icon(Icons.clear),
                     label: const Text('Clear'),
+                    style: TextButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -477,8 +479,14 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                             subtitle: Text('IP: ${device.ip}'),
                             children: [
                               Padding(
-                                padding: const EdgeInsets.all(16.0),
+                                padding: const EdgeInsets.only(
+                                  left: 26.0,
+                                  right: 26,
+                                  top: 8,
+                                  bottom: 8,
+                                ),
                                 child: Column(
+                                  spacing: 4,
                                   children: [
                                     _buildDetailRow(
                                       'IP Address',
@@ -506,6 +514,13 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                                                   device,
                                                 );
                                               },
+                                        style: ElevatedButton.styleFrom(
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              4.0,
+                                            ),
+                                          ),
+                                        ),
                                         child: Text(
                                           isAlreadyAdded
                                               ? 'Device already added'
@@ -532,22 +547,17 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
+        spacing: 12,
         children: [
           Icon(icon, size: 20, color: Colors.grey.shade600),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade700,
-              ),
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
             ),
           ),
-          Expanded(
-            child: Text(value, style: const TextStyle(fontFamily: 'monospace')),
-          ),
+          Expanded(child: Text(value)),
         ],
       ),
     );
