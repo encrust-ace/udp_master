@@ -130,13 +130,29 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
   int waitTime = 5;
   DeviceType deviceType = DeviceType.wled;
 
+  @override
+  void initState() {
+    super.initState();
+    widget.visualizerProvider.addListener(_onVisualizerProviderUpdate);
+  }
+
+  @override
+  void dispose() {
+    widget.visualizerProvider.removeListener(_onVisualizerProviderUpdate);
+    super.dispose();
+  }
+
+  void _onVisualizerProviderUpdate() {
+    setState(() {});
+  }
+
   Future<List<dynamic>> _discoverDevices({
     required DeviceType deviceType,
     String broadcastSpace = "255.255.255.255",
     int waitTime = defaultWaitTime,
   }) async {
     if (deviceType == DeviceType.wled || deviceType == DeviceType.esphome) {
-      final List<Device> wledDevices = [];
+      final List<Device> foundDevices = [];
       final BonsoirDiscovery discovery = BonsoirDiscovery(
         type: deviceType == DeviceType.wled ? "_wled._tcp" : "_esphomelib._tcp",
       );
@@ -148,7 +164,7 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
       final completer = Completer<List<Device>>();
       final timer = Timer(Duration(seconds: waitTime), () {
         if (!completer.isCompleted) {
-          completer.complete(wledDevices);
+          completer.complete(foundDevices);
         }
       });
 
@@ -166,11 +182,11 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
         if (service.host != null) {
           // This is the most reliable check for a resolved service
           debugPrint('Resolved service found: ${service.toJson()}');
-          final isDuplicate = wledDevices.any(
+          final isDuplicate = foundDevices.any(
             (device) => device.ip == service.host,
           );
           if (!isDuplicate) {
-            wledDevices.add(
+            foundDevices.add(
               Device(
                 name: service.name,
                 ip: service.host!,
@@ -281,7 +297,7 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
     }
   }
 
-  void showAddDeviceDialog(BuildContext context, Device device) {
+  void _showAddDeviceDialog(BuildContext context, Device device) {
     showDialog(
       barrierDismissible: false,
       useSafeArea: true,
@@ -291,7 +307,7 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
           visualizerProvider: widget.visualizerProvider,
           device: LedDevice(
             id: '',
-            name: device.name ?? '',
+            name: device.name ?? 'Unknown',
             ip: device.ip,
             port: device.port,
             ledCount: 0,
@@ -312,55 +328,66 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          spacing: 16,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 8,
           children: [
-            DropdownButtonFormField<String>(
-              value: DeviceType.wled.name,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 12,
-                ),
-              ),
-              items: DeviceType.values
-                  .map(
-                    (deviceType) => DropdownMenuItem(
-                      value: deviceType.name,
-                      child: Text(deviceType.name),
+            Row(
+              spacing: 8,
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: deviceType.name,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 12,
+                      ),
                     ),
-                  )
-                  .toList(),
-              onChanged: (val) {
-                if (val != null) {
-                  deviceType = DeviceType.values.firstWhere(
-                    (deviceType) => deviceType.name == val,
-                  );
-                }
-              },
-            ),
-            // Scan Button
-            ElevatedButton.icon(
-              onPressed: isScanning ? null : _scanForDevices,
-              icon: isScanning
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.search),
-              label: Text(isScanning ? 'Scanning...' : 'Scan for devices'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                textStyle: const TextStyle(fontSize: 16),
-              ),
+                    items: DeviceType.values
+                        .map(
+                          (deviceType) => DropdownMenuItem(
+                            value: deviceType.name,
+                            child: Text(deviceType.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          deviceType = DeviceType.values.firstWhere(
+                            (dt) => dt.name == val,
+                          );
+                        });
+                      }
+                    },
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isScanning ? null : _scanForDevices,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                    textStyle: const TextStyle(fontSize: 16),
+                  ),
+                  child: Row(
+                    spacing: 4,
+                    children: [
+                      isScanning
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.search),
+                      Text(isScanning ? 'Scanning...' : 'Scan for devices'),
+                    ],
+                  ),
+                ),
+              ],
             ),
 
-            // Status/Error Message
             if (errorMessage != null)
               Card(
                 color: Colors.red.shade50,
@@ -428,6 +455,12 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                       itemCount: discoveredDevices.length,
                       itemBuilder: (context, index) {
                         final device = discoveredDevices[index];
+                        final isAlreadyAdded = widget.visualizerProvider.devices
+                            .any(
+                              (existingDevice) =>
+                                  existingDevice.ip == device.ip,
+                            );
+
                         return Card(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ExpansionTile(
@@ -465,26 +498,16 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                                     SizedBox(
                                       width: double.infinity,
                                       child: ElevatedButton(
-                                        onPressed:
-                                            widget.visualizerProvider.devices
-                                                .any(
-                                                  (existingDevice) =>
-                                                      existingDevice.ip ==
-                                                      device.ip,
-                                                )
+                                        onPressed: isAlreadyAdded
                                             ? null
                                             : () {
-                                                showAddDeviceDialog(
+                                                _showAddDeviceDialog(
                                                   context,
                                                   device,
                                                 );
                                               },
                                         child: Text(
-                                          widget.visualizerProvider.devices.any(
-                                                (existingDevice) =>
-                                                    existingDevice.ip ==
-                                                    device.ip,
-                                              )
+                                          isAlreadyAdded
                                               ? 'Device already added'
                                               : "Add Device",
                                         ),

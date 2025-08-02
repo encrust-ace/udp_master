@@ -32,17 +32,15 @@ class _AddDeviceState extends State<AddDevice> {
   void initState() {
     super.initState();
     final d = widget.device;
-    if (d != null) {
-      _selectedEffect = d.effect != ""
-          ? widget.visualizerProvider.getEffectById(d.effect)
-          : widget.visualizerProvider.effects.first;
-      _nameController.text = d.name;
-      _ipController.text = d.ip;
-      _ledCountController.text = d.ledCount.toString();
-      _portController.text = d.port.toString();
-      _selectedDeviceType = d.type;
+    _selectedEffect = d.effect != ""
+        ? widget.visualizerProvider.getEffectById(d.effect)
+        : widget.visualizerProvider.effects.first;
+    _nameController.text = d.name;
+    _ipController.text = d.ip;
+    _ledCountController.text = d.ledCount.toString();
+    _portController.text = d.port.toString();
+    _selectedDeviceType = d.type;
     }
-  }
 
   @override
   void dispose() {
