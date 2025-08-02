@@ -4,9 +4,15 @@ import 'package:udp_master/visualizer_provider.dart';
 
 class AddDevice extends StatefulWidget {
   final VisualizerProvider visualizerProvider;
-  final LedDevice? device;
+  final LedDevice device;
+  final DeviceAction action;
 
-  const AddDevice({super.key, required this.visualizerProvider, this.device});
+  const AddDevice({
+    super.key,
+    required this.visualizerProvider,
+    required this.device,
+    required this.action,
+  });
 
   @override
   State<AddDevice> createState() => _AddDeviceState();
@@ -18,6 +24,7 @@ class _AddDeviceState extends State<AddDevice> {
   final _ledCountController = TextEditingController();
   final _ipController = TextEditingController();
   final _portController = TextEditingController(text: '21324');
+  late LedEffect _selectedEffect;
 
   DeviceType _selectedDeviceType = DeviceType.wled;
 
@@ -26,6 +33,9 @@ class _AddDeviceState extends State<AddDevice> {
     super.initState();
     final d = widget.device;
     if (d != null) {
+      _selectedEffect = d.effect != ""
+          ? widget.visualizerProvider.getEffectById(d.effect)
+          : widget.visualizerProvider.effects.first;
       _nameController.text = d.name;
       _ipController.text = d.ip;
       _ledCountController.text = d.ledCount.toString();
@@ -47,19 +57,19 @@ class _AddDeviceState extends State<AddDevice> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final device = LedDevice(
-      id: widget.device?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      id: widget.device.id,
       name: _nameController.text.trim(),
       ip: _ipController.text.trim(),
       ledCount: int.parse(_ledCountController.text.trim()),
-      effect: widget.visualizerProvider.effects.first.id,
-      isEffectEnabled: widget.device?.isEffectEnabled ?? true,
+      effect: _selectedEffect.id,
+      isEffectEnabled: widget.device.isEffectEnabled,
       type: _selectedDeviceType,
       port: int.parse(_portController.text.trim()),
     );
 
     final message = await widget.visualizerProvider.deviceActions(
       device,
-      widget.device == null ? DeviceAction.add : DeviceAction.update,
+      widget.action,
     );
 
     ScaffoldMessenger.of(
@@ -92,16 +102,17 @@ class _AddDeviceState extends State<AddDevice> {
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 24,
           children: [
             // Import/Export buttons
             Row(
+              spacing: 12,
               children: [
                 ElevatedButton(
                   onPressed: () =>
                       widget.visualizerProvider.importDevicesFromJsonFile(),
                   child: const Text("Import Devices"),
                 ),
-                const SizedBox(width: 12),
                 ElevatedButton(
                   onPressed: () => widget.visualizerProvider
                       .exportDevicesToJsonFile(context),
@@ -109,10 +120,9 @@ class _AddDeviceState extends State<AddDevice> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-
             // Name & LED count
             Row(
+              spacing: 12,
               children: [
                 Expanded(
                   flex: 3,
@@ -128,7 +138,6 @@ class _AddDeviceState extends State<AddDevice> {
                         : null,
                   ),
                 ),
-                const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
                   child: TextFormField(
@@ -144,10 +153,9 @@ class _AddDeviceState extends State<AddDevice> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-
             // IP & Port
             Row(
+              spacing: 12,
               children: [
                 Expanded(
                   flex: 3,
@@ -166,10 +174,10 @@ class _AddDeviceState extends State<AddDevice> {
                         : null,
                   ),
                 ),
-                const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
                   child: TextFormField(
+                    readOnly: true,
                     controller: _portController,
                     decoration: _inputDecoration(
                       "Port",
@@ -185,27 +193,62 @@ class _AddDeviceState extends State<AddDevice> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-
             // Device Type
-            DropdownButtonFormField<DeviceType>(
-              decoration: _inputDecoration("Device Type", Icons.merge_type),
-              value: _selectedDeviceType,
-              items: DeviceType.values
-                  .map(
-                    (type) => DropdownMenuItem(
-                      value: type,
-                      child: Text(type.name),
+            Row(
+              spacing: 12,
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<DeviceType>(
+                    decoration: _inputDecoration(
+                      "Device Type",
+                      Icons.device_hub,
                     ),
-                  )
-                  .toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedDeviceType = val);
-              },
-              validator: (value) => value == null ? 'Select device type' : null,
+                    value: _selectedDeviceType,
+                    items: DeviceType.values
+                        .map(
+                          (type) => DropdownMenuItem(
+                            value: type,
+                            child: Text(type.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _selectedDeviceType = val;
+                          _portController.text = val.port.toString();
+                        });
+                      }
+                    },
+                    validator: (value) =>
+                        value == null ? 'Select device type' : null,
+                  ),
+                ),
+                Expanded(
+                  child: DropdownButtonFormField<LedEffect>(
+                    decoration: _inputDecoration("Effect", Icons.style),
+                    value: _selectedEffect,
+                    items: widget.visualizerProvider.effects
+                        .map(
+                          (type) => DropdownMenuItem(
+                            value: type,
+                            child: Text(type.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _selectedEffect = val;
+                        });
+                      }
+                    },
+                    validator: (value) =>
+                        value == null ? 'Select device type' : null,
+                  ),
+                ),
+              ],
             ),
-
-            const SizedBox(height: 32),
 
             // Actions
             Row(
@@ -219,7 +262,9 @@ class _AddDeviceState extends State<AddDevice> {
                 ElevatedButton(
                   onPressed: _submit,
                   child: Text(
-                    widget.device == null ? "Add Device" : "Update Device",
+                    widget.action == DeviceAction.add
+                        ? "Add Device"
+                        : "Update Device",
                   ),
                 ),
               ],

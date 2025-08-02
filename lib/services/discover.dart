@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:bonsoir/bonsoir.dart';
 import 'package:flutter/material.dart';
 import 'package:udp_master/models.dart';
+import 'package:udp_master/screen/add_device.dart';
+import 'package:udp_master/visualizer_provider.dart';
 
 // Your discovery code - include these classes/functions
 const defaultWaitTime = 5;
@@ -26,12 +29,13 @@ class DeviceRegistry {
   List<DiscoveredDevice> bulbs() => _devices;
 }
 
-class WizLight {
+class Device {
+  final String? name;
   final String ip;
   final int port;
   final String? mac;
 
-  WizLight({required this.ip, required this.port, this.mac});
+  Device({this.name, required this.ip, required this.port, this.mac});
 }
 
 class BroadcastProtocol {
@@ -110,52 +114,196 @@ class BroadcastProtocol {
   }
 }
 
-Future<List<DiscoveredDevice>> _discoverLights({
-  String broadcastSpace = "255.255.255.255",
-  int waitTime = defaultWaitTime,
-  required DeviceType deviceType,
-}) async {
-  final BroadcastProtocol broadcastProtocol = BroadcastProtocol(
-    broadcastSpace,
-    waitTime,
-    deviceType,
-  );
-
-  await broadcastProtocol.broadcastRegistration();
-
-  return broadcastProtocol.discoveryBulbs;
-}
-
-Future<List<WizLight>> findWizlights({
-  String broadcastSpace = "255.255.255.255",
-  int waitTime = defaultWaitTime,
-  required DeviceType deviceType,
-}) async {
-  final List<DiscoveredDevice> discoveredIPs = await _discoverLights(
-    broadcastSpace: broadcastSpace,
-    waitTime: waitTime,
-    deviceType: deviceType,
-  );
-
-  return discoveredIPs
-      .map((e) => WizLight(ip: e.ip, port: deviceType.port, mac: e.mac))
-      .toList();
-}
-
-class WizBulbDiscoveryPage extends StatefulWidget {
-  const WizBulbDiscoveryPage({super.key});
+class DeviceScanPage extends StatefulWidget {
+  final VisualizerProvider visualizerProvider;
+  const DeviceScanPage({super.key, required this.visualizerProvider});
 
   @override
-  State<WizBulbDiscoveryPage> createState() => _WizBulbDiscoveryPageState();
+  State<DeviceScanPage> createState() => _DeviceScanPageState();
 }
 
-class _WizBulbDiscoveryPageState extends State<WizBulbDiscoveryPage> {
-  List<WizLight> discoveredDevices = [];
+class _DeviceScanPageState extends State<DeviceScanPage> {
+  List<Device> discoveredDevices = [];
   bool isScanning = false;
   String? errorMessage;
   String broadcastAddress = "255.255.255.255";
   int waitTime = 5;
   DeviceType deviceType = DeviceType.wled;
+
+  Future<List<dynamic>> _discoverDevices({
+    required DeviceType deviceType,
+    String broadcastSpace = "255.255.255.255",
+    int waitTime = defaultWaitTime,
+  }) async {
+    if (deviceType == DeviceType.wled || deviceType == DeviceType.esphome) {
+      final List<Device> wledDevices = [];
+      final BonsoirDiscovery discovery = BonsoirDiscovery(
+        type: deviceType == DeviceType.wled ? "_wled._tcp" : "_esphomelib._tcp",
+      );
+
+      await discovery.initialize();
+      await discovery.start();
+
+      // Use a Completer and a Timer to control the discovery duration
+      final completer = Completer<List<Device>>();
+      final timer = Timer(Duration(seconds: waitTime), () {
+        if (!completer.isCompleted) {
+          completer.complete(wledDevices);
+        }
+      });
+
+      discovery.eventStream!.listen((event) {
+        if (event.service == null) {
+          return;
+        }
+
+        // The event types are defined internally in Bonsoir and are not public enums.
+        // We must compare against the internal integer values or rely on service properties.
+        // This is a known issue with the bonsoir API, but we can make it work.
+        // Based on the bonsoir internal logic, a service with a host and port
+        // is a resolved service.
+        final service = event.service!;
+        if (service.host != null) {
+          // This is the most reliable check for a resolved service
+          debugPrint('Resolved service found: ${service.toJson()}');
+          final isDuplicate = wledDevices.any(
+            (device) => device.ip == service.host,
+          );
+          if (!isDuplicate) {
+            wledDevices.add(
+              Device(
+                name: service.name,
+                ip: service.host!,
+                port: deviceType.port,
+                mac: service.attributes['mac'],
+              ),
+            );
+          }
+        } else {
+          // A service without host/port is an unresolved service,
+          // so we ask bonsoir to resolve it.
+          debugPrint(
+            'Unresolved service found, resolving: ${service.toJson()}',
+          );
+          service.resolve(discovery.serviceResolver);
+        }
+      });
+
+      final result = await completer.future;
+      await discovery.stop();
+      timer.cancel();
+      return result;
+    } else if (deviceType == DeviceType.wiz) {
+      // Wiz discovery logic
+      final BroadcastProtocol broadcastProtocol = BroadcastProtocol(
+        broadcastSpace,
+        waitTime,
+        deviceType,
+      );
+
+      await broadcastProtocol.broadcastRegistration();
+      return broadcastProtocol.discoveryBulbs;
+    }
+
+    return [];
+  }
+
+  Future<List<Device>> _findWizLights({
+    String broadcastSpace = "255.255.255.255",
+    int waitTime = defaultWaitTime,
+  }) async {
+    final List<DiscoveredDevice> discoveredIPs =
+        await _discoverDevices(
+              broadcastSpace: broadcastSpace,
+              waitTime: waitTime,
+              deviceType: deviceType,
+            )
+            as List<DiscoveredDevice>;
+
+    return discoveredIPs
+        .map((e) => Device(ip: e.ip, port: deviceType.port, mac: e.mac))
+        .toList();
+  }
+
+  Future<List<Device>> _findWledLights({int waitTime = defaultWaitTime}) async {
+    final List<dynamic> discoveredDevices = await _discoverDevices(
+      waitTime: waitTime,
+      deviceType: deviceType,
+    );
+    return discoveredDevices.cast<Device>(); // Cast the result
+  }
+
+  Future<void> _scanForDevices() async {
+    setState(() {
+      isScanning = true;
+      errorMessage = null;
+      discoveredDevices.clear();
+    });
+
+    try {
+      List<dynamic> foundDevices;
+      if (deviceType == DeviceType.wled || deviceType == DeviceType.esphome) {
+        final wledDevices = await _findWledLights(waitTime: waitTime);
+        foundDevices = wledDevices;
+      } else if (deviceType == DeviceType.wiz) {
+        foundDevices = await _findWizLights(
+          broadcastSpace: broadcastAddress,
+          waitTime: waitTime,
+        );
+      } else {
+        foundDevices = [];
+      }
+
+      setState(() {
+        discoveredDevices = foundDevices.map((d) {
+          if (d is Device) {
+            return Device(name: d.name, ip: d.ip, port: d.port, mac: d.mac);
+          }
+          return d as Device;
+        }).toList();
+
+        isScanning = false;
+      });
+
+      if (foundDevices.isEmpty) {
+        setState(() {
+          errorMessage =
+              'No devices of type ${deviceType.name} found on the network.';
+        });
+      } else {
+        _showSnackBar('Found ${foundDevices.length} devices!');
+      }
+    } catch (e) {
+      setState(() {
+        isScanning = false;
+        errorMessage = 'Error during discovery: ${e.toString()}';
+      });
+    }
+  }
+
+  void showAddDeviceDialog(BuildContext context, Device device) {
+    showDialog(
+      barrierDismissible: false,
+      useSafeArea: true,
+      context: context,
+      builder: (_) => Dialog(
+        child: AddDevice(
+          visualizerProvider: widget.visualizerProvider,
+          device: LedDevice(
+            id: '',
+            name: device.name ?? '',
+            ip: device.ip,
+            port: device.port,
+            ledCount: 0,
+            effect: '',
+            isEffectEnabled: true,
+            type: deviceType,
+          ),
+          action: DeviceAction.add,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +345,7 @@ class _WizBulbDiscoveryPageState extends State<WizBulbDiscoveryPage> {
             ),
             // Scan Button
             ElevatedButton.icon(
-              onPressed: isScanning ? null : _scanForBulbs,
+              onPressed: isScanning ? null : _scanForDevices,
               icon: isScanning
                   ? const SizedBox(
                       width: 20,
@@ -232,7 +380,6 @@ class _WizBulbDiscoveryPageState extends State<WizBulbDiscoveryPage> {
                   ),
                 ),
               ),
-
             // Results Header
             if (discoveredDevices.isNotEmpty) ...[
               Row(
@@ -257,83 +404,103 @@ class _WizBulbDiscoveryPageState extends State<WizBulbDiscoveryPage> {
             // Discovered Bulbs List
             Expanded(
               child: discoveredDevices.isEmpty
-                  ? _buildEmptyState()
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.lightbulb_outline,
+                            size: 64,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No devices discovered',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
                   : ListView.builder(
                       itemCount: discoveredDevices.length,
                       itemBuilder: (context, index) {
-                        final bulb = discoveredDevices[index];
-                        return _buildBulbCard(bulb, index);
+                        final device = discoveredDevices[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ExpansionTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Theme.of(context).primaryColor,
+                              child: Icon(Icons.light),
+                            ),
+                            title: Text(
+                              device.name ?? 'Unknown',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text('IP: ${device.ip}'),
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  children: [
+                                    _buildDetailRow(
+                                      'IP Address',
+                                      device.ip,
+                                      Icons.language,
+                                    ),
+                                    _buildDetailRow(
+                                      'Port',
+                                      device.port.toString(),
+                                      Icons.settings_ethernet,
+                                    ),
+                                    _buildDetailRow(
+                                      'MAC Address',
+                                      device.mac ?? 'Unknown',
+                                      Icons.device_hub,
+                                    ),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        onPressed:
+                                            widget.visualizerProvider.devices
+                                                .any(
+                                                  (existingDevice) =>
+                                                      existingDevice.ip ==
+                                                      device.ip,
+                                                )
+                                            ? null
+                                            : () {
+                                                showAddDeviceDialog(
+                                                  context,
+                                                  device,
+                                                );
+                                              },
+                                        child: Text(
+                                          widget.visualizerProvider.devices.any(
+                                                (existingDevice) =>
+                                                    existingDevice.ip ==
+                                                    device.ip,
+                                              )
+                                              ? 'Device already added'
+                                              : "Add Device",
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
                       },
                     ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.lightbulb_outline, size: 64, color: Colors.grey.shade400),
-          const SizedBox(height: 16),
-          Text(
-            'No devices discovered',
-            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBulbCard(WizLight bulb, int index) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ExpansionTile(
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).primaryColor,
-          child: Text(
-            '${index + 1}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        title: Text(
-          'Device ${index + 1}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text('IP: ${bulb.ip}'),
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                _buildDetailRow('IP Address', bulb.ip, Icons.language),
-                _buildDetailRow(
-                  'Port',
-                  bulb.port.toString(),
-                  Icons.settings_ethernet,
-                ),
-                _buildDetailRow(
-                  'MAC Address',
-                  bulb.mac ?? 'Unknown',
-                  Icons.device_hub,
-                ),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    child: Text("Add Device"),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -361,43 +528,6 @@ class _WizBulbDiscoveryPageState extends State<WizBulbDiscoveryPage> {
         ],
       ),
     );
-  }
-
-  Future<void> _scanForBulbs() async {
-    setState(() {
-      isScanning = true;
-      errorMessage = null;
-      discoveredDevices.clear();
-    });
-
-    try {
-      final bulbs = await findWizlights(
-        broadcastSpace: broadcastAddress,
-        waitTime: waitTime,
-        deviceType: deviceType,
-      );
-
-      setState(() {
-        discoveredDevices = bulbs;
-        isScanning = false;
-      });
-
-      if (bulbs.isEmpty) {
-        setState(() {
-          errorMessage =
-              'No device found on the network. Make sure they are powered on and connected to the same network.';
-        });
-      } else {
-        _showSnackBar(
-          'Found ${bulbs.length} devices${bulbs.length == 1 ? '' : 's'}!',
-        );
-      }
-    } catch (e) {
-      setState(() {
-        isScanning = false;
-        errorMessage = 'Error during discovery: ${e.toString()}';
-      });
-    }
   }
 
   void _clearResults() {

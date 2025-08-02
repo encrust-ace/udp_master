@@ -228,7 +228,7 @@ class _HomeState extends State<Home> {
         ),
         const SizedBox(height: 8),
         infoRow(Icons.lan, device.ip),
-        infoRow(Icons.wifi, 'PORT: ${device.port}'),
+        infoRow(Icons.settings_ethernet, 'PORT: ${device.port}'),
         infoRow(Icons.linear_scale, 'LEDs: ${device.ledCount}'),
         infoRow(Icons.category, device.type.name),
       ],
@@ -286,6 +286,7 @@ class _HomeState extends State<Home> {
                     child: AddDevice(
                       visualizerProvider: widget.visualizerProvider,
                       device: device,
+                      action: DeviceAction.update,
                     ),
                   ),
                 );

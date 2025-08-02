@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:udp_master/screen/add_device.dart';
 import 'package:udp_master/screen/effects.dart';
 import 'package:udp_master/screen/home.dart';
 import 'package:udp_master/screen/simulator_page.dart';
@@ -56,16 +55,6 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
     }
   }
 
-  void _showAddDeviceDialog(BuildContext context) {
-    showDialog(
-      barrierDismissible: false,
-      useSafeArea: true,
-      context: context,
-      builder: (_) =>
-          Dialog(child: AddDevice(visualizerProvider: _visualizerProvider)),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -73,20 +62,19 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
         title: const Icon(Icons.lightbulb, size: 36),
         actions: [
           IconButton(
+            iconSize: 36,
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const WizBulbDiscoveryPage(),
+                  builder: (context) =>
+                      DeviceScanPage(visualizerProvider: _visualizerProvider),
                 ),
               );
             },
             icon: Icon(Icons.search),
           ),
-          IconButton(
-            onPressed: () => _showAddDeviceDialog(context),
-            icon: const Icon(Icons.add, size: 36),
-          ),
+
           const SizedBox(width: 16),
         ],
       ),
