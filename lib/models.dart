@@ -4,9 +4,8 @@ enum DeviceAction { add, update, delete }
 
 enum DeviceType {
   wled('Wled', 21324),
-  esphome('ESP Home', 21324),
-  udp('UDP', 21324),
   wiz('Wiz', 38899),
+  esphome('ESP Home', 21324),
   tuya('Tuya', 21324);
 
   const DeviceType(this.name, this.port);
