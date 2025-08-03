@@ -31,13 +31,13 @@ const EventChannel _micStreamChannel = EventChannel('mic_stream');
 class VisualizerProvider with ChangeNotifier {
   static final VisualizerProvider _instance = VisualizerProvider._internal();
   final UdpSender _udpSender = UdpSender();
+    final AudioAnalyzer _audioAnalyzer = AudioAnalyzer();
+
   factory VisualizerProvider() {
     return _instance;
   }
 
   VisualizerProvider._internal();
-
-  final AudioAnalyzer _audioAnalyzer = AudioAnalyzer();
   CastMode _castMode = CastMode.audio;
   CastMode get castMode => _castMode;
   set castMode(CastMode value) {
@@ -72,11 +72,70 @@ class VisualizerProvider with ChangeNotifier {
 
   // --- Effect Management ---
 
-  // --- Effect List ---
+  // Updated effects list with new advanced effects
   List<LedEffect> _effects = [
     LedEffect(
+      id: 'energy',
+      name: 'Energy',
+      parameters: {
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
+        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+      },
+    ),
+    LedEffect(
+      id: 'scroll',
+      name: 'Scroll',
+      parameters: {
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
+        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+        'speed': {'min': 0.1, 'max': 3.0, 'value': 1.0, 'steps': 10},
+      },
+    ),
+    LedEffect(
+      id: 'wavelength',
+      name: 'Wavelength',
+      parameters: {
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
+        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+      },
+    ),
+    LedEffect(
+      id: 'spectrum',
+      name: 'Spectrum Analyzer',
+      parameters: {
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
+        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+      },
+    ),
+    LedEffect(
+      id: 'beat-pulse',
+      name: 'Beat Pulse',
+      parameters: {
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
+        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+      },
+    ),
+    LedEffect(
+      id: 'advanced-rhythm',
+      name: 'Advanced Rhythm',
+      parameters: {
+        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
+        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+        'raiseSpeed': {'min': 5.0, 'max': 30.0, 'value': 12.5, 'steps': 10},
+        'decaySpeed': {'min': 0.3, 'max': 1.0, 'value': 0.5, 'steps': 7},
+        'dropSpeed': {'min': 0.1, 'max': 1.0, 'value': 0.5, 'steps': 9},
+      },
+    ),
+    // Keep your existing effects for compatibility
+    LedEffect(
       id: 'volume-bars',
-      name: 'Volume Bars',
+      name: 'Volume Bars (Legacy)',
       parameters: {
         'gain': {'min': 1.0, 'max': 5.0, 'value': 1.0, 'steps': 8},
         'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
@@ -85,14 +144,14 @@ class VisualizerProvider with ChangeNotifier {
     ),
     LedEffect(
       id: 'center-pulse',
-      name: 'Center Pulse',
+      name: 'Center Pulse (Legacy)',
       parameters: {
         'gain': {'min': 1.0, 'max': 5.0, 'value': 1.0, 'steps': 8},
       },
     ),
     LedEffect(
       id: 'music-rhythm',
-      name: 'Music Rhythm',
+      name: 'Music Rhythm (Legacy)',
       parameters: {
         'gain': {'min': 1.0, 'max': 5.0, 'value': 1.0, 'steps': 8},
         'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
@@ -141,7 +200,8 @@ class VisualizerProvider with ChangeNotifier {
     return true;
   }
 
-  Future<void> sendUdpToDevices({
+  // Enhanced UDP sending function
+  Future<void> sendUdpToDevicesEnhanced({
     required List<LedDevice> targetDevices,
     required Float32List fft,
   }) async {
@@ -152,6 +212,9 @@ class VisualizerProvider with ChangeNotifier {
       return;
     }
 
+    // Analyze audio once for all devices
+    final AudioFeatures features = _audioAnalyzer.analyzeAudio(fft, 44100.0);
+
     for (var device in targetDevices) {
       final target = Endpoint.unicast(
         InternetAddress(device.ip),
@@ -159,77 +222,90 @@ class VisualizerProvider with ChangeNotifier {
       );
 
       try {
-        if (device.type == DeviceType.wled ||
-            device.type == DeviceType.esphome) {
+        if (device.type == DeviceType.wled || device.type == DeviceType.esphome) {
           LedEffect effect = getEffectById(device.effect);
           late List<int> packetData;
-          switch (effect.id) {
-            case 'volume-bars':
-              packetData = renderVerticalBars(
-                device: device,
-                fft: fft,
-                gain: effect.parameters["gain"]?["value"] ?? 2.0,
-                brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-                saturation: effect.parameters["saturation"]?["value"] ?? 1.0, 
-                analyzer: _audioAnalyzer,
-              );
-              break;
-            case 'center-pulse':
-              packetData = renderCenterPulsePacket(
-                device: device,
-                fft: fft,
-                gain: effect.parameters["gain"]?["value"] ?? 2.0,
-              );
-              break;
-            case 'music-rhythm':
-              packetData = renderBeatDropEffect(
-                device: device,
-                fft: fft,
-                gain: effect.parameters["gain"]?["value"] ?? 2.0,
-                brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-                saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-                raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 10.0,
-                decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 1.0,
-                dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
-              );
-              break;
-            default:
-              continue;
+          
+          // Use enhanced effects for new effect types
+          if (['energy', 'scroll', 'wavelength', 'spectrum', 'beat-pulse', 'advanced-rhythm'].contains(effect.id)) {
+            packetData = renderEnhancedEffect(
+              device: device,
+              features: features,
+              effectId: effect.id,
+              parameters: effect.parameters,
+            );
+          } else {
+            // Fallback to legacy effects
+            switch (effect.id) {
+              case 'volume-bars':
+                packetData = renderVerticalBars(
+                  device: device,
+                  fft: fft,
+                  gain: effect.parameters["gain"]?["value"] ?? 2.0,
+                  brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+                  saturation: effect.parameters["saturation"]?["value"] ?? 1.0, 
+                  analyzer: _audioAnalyzer,
+                );
+                break;
+              case 'center-pulse':
+                packetData = renderCenterPulsePacket(
+                  device: device,
+                  fft: fft,
+                  gain: effect.parameters["gain"]?["value"] ?? 2.0,
+                );
+                break;
+              case 'music-rhythm':
+                packetData = renderBeatDropEffect(
+                  device: device,
+                  fft: fft,
+                  gain: effect.parameters["gain"]?["value"] ?? 2.0,
+                  brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+                  saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+                  raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 10.0,
+                  decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 1.0,
+                  dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
+                );
+                break;
+              default:
+                continue;
+            }
           }
+          
           if (packetData.isNotEmpty) {
             _udpSender.udpInstance?.send(packetData, target);
           }
         } else if (device.type == DeviceType.wiz) {
+          // For WiZ devices, use enhanced analysis but simple color output
           LedEffect effect = getEffectById(device.effect);
-          late List<int> packetData;
-          switch (effect.id) {
-            case 'volume-bars':
-              packetData = renderVerticalBars(
-                device: device,
-                fft: fft,
-                gain: effect.parameters["gain"]?["value"] ?? 2.0,
-                brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-                saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-                analyzer: _audioAnalyzer,
-              );
-              break;
-            default:
-              continue;
-          }
-
-          final r = packetData.first > 0 ? packetData[0] : 0;
-          final g = packetData.length > 1 ? packetData[1] : 0;
-          final b = packetData.length > 2 ? packetData[2] : 0;
-          final brightness = packetData.length > 3 ? packetData[3] : 0;
+          
+          // Calculate color based on enhanced audio features
+          double intensity = (features.bass * 0.4 + features.mid * 0.4 + features.treble * 0.2);
+          intensity *= effect.parameters["gain"]?["value"] ?? 2.0;
+          intensity *= features.adaptiveGain;
+          intensity *= (1.0 + features.beatStrength * 0.5);
+          intensity = intensity.clamp(0.0, 1.0);
+          
+          // Dynamic color based on spectral centroid
+          double hue = (features.spectralCentroid / 8000.0).clamp(0.0, 1.0);
+          hue = 0.7 - hue * 0.4; // Map to red-blue range
+          
+          final brightness = effect.parameters["brightness"]?["value"] ?? 1.0;
+          final saturation = effect.parameters["saturation"]?["value"] ?? 1.0;
+          
+          final rgb = _hsvToRgb(hue, saturation, intensity * brightness);
+          final r = rgb[0];
+          final g = rgb[1];
+          final b = rgb[2];
+          final dimming = (intensity * brightness * 100).round();
 
           final data = {
             "method": "setPilot",
             "params": {
-              "state": brightness > 10,
+              "state": dimming > 10,
               "r": r.clamp(0, 255),
               "g": g.clamp(0, 255),
               "b": b.clamp(0, 255),
-              "dimming": brightness,
+              "dimming": dimming.clamp(10, 100),
             },
           };
 
@@ -244,47 +320,62 @@ class VisualizerProvider with ChangeNotifier {
     }
   }
 
-  Future<void> simulatorPageData(LedDevice device, Float32List fft) async {
-    // For simulators - update the 'packets' variable
+   // Enhanced simulator page data
+  Future<void> simulatorPageDataEnhanced(LedDevice device, Float32List fft) async {
+    // Analyze audio with enhanced features
+    final AudioFeatures features = _audioAnalyzer.analyzeAudio(fft, 44100.0);
+    
     LedEffect effect = getEffectById(device.effect);
     late List<int> packetData;
-    switch (effect.id) {
-      case 'volume-bars':
-        packetData = renderVerticalBars(
-          device: device,
-          fft: fft,
-          gain: effect.parameters["gain"]?["value"] ?? 2.0,
-          brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-          saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-          analyzer: _audioAnalyzer,
-        );
-        break;
-      case 'center-pulse':
-        packetData = renderCenterPulsePacket(
-          device: device,
-          fft: fft,
-          gain: effect.parameters["gain"]?["value"] ?? 2.0,
-        );
-        break;
-      case 'music-rhythm':
-        packetData = renderBeatDropEffect(
-          device: device,
-          fft: fft,
-          gain: effect.parameters["gain"]?["value"] ?? 2.0,
-          brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-          saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-          raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 10.0,
-          decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 1.0,
-          dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
-        );
-        break;
-      default:
-        packetData = []; // Or some default empty/error state
+    
+    // Use enhanced effects for new effect types
+    if (['energy', 'scroll', 'wavelength', 'spectrum', 'beat-pulse', 'advanced-rhythm'].contains(effect.id)) {
+      packetData = renderEnhancedEffect(
+        device: device,
+        features: features,
+        effectId: effect.id,
+        parameters: effect.parameters,
+      );
+    } else {
+      // Fallback to legacy effects for compatibility
+      switch (effect.id) {
+        case 'volume-bars':
+          packetData = renderVerticalBars(
+            device: device,
+            fft: fft,
+            gain: effect.parameters["gain"]?["value"] ?? 2.0,
+            brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+            saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+            analyzer: _audioAnalyzer
+          );
+          break;
+        case 'center-pulse':
+          packetData = renderCenterPulsePacket(
+            device: device,
+            fft: fft,
+            gain: effect.parameters["gain"]?["value"] ?? 2.0,
+          );
+          break;
+        case 'music-rhythm':
+          packetData = renderBeatDropEffect(
+            device: device,
+            fft: fft,
+            gain: effect.parameters["gain"]?["value"] ?? 2.0,
+            brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+            saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+            raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 10.0,
+            decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 1.0,
+            dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
+          );
+          break;
+        default:
+          packetData = [];
+      }
     }
+    
     packets = packetData;
-    notifyListeners(); // Notify listeners to update UI or other parts
+    notifyListeners();
   }
-
   // --- Device Management ---
 
   Future<void> initiateTheAppData() async {
@@ -464,11 +555,11 @@ class VisualizerProvider with ChangeNotifier {
     if (Platform.isLinux) {
       await _startMicLinux();
     } else {
-      await _startMicAndroid(); // Await for _startMicAndroid as well
+      await _startMicAndroid();
     }
 
     _isRunning = true;
-    notifyListeners(); // Notify UI or other parts of the app
+    notifyListeners();
     return true;
   }
 
@@ -504,28 +595,26 @@ class VisualizerProvider with ChangeNotifier {
     await _platform.invokeMethod("startMic");
     _micSubscription = _micStreamChannel.receiveBroadcastStream().listen(
       (samples) {
-        if (!_isRunning || _devices.isEmpty) return; // Guard clause
+        if (!_isRunning || _devices.isEmpty) return;
 
-        // Ensure samples is List<double>
         List<double> doubleSamples;
         if (samples is List<dynamic>) {
           doubleSamples = samples.map((s) => (s as num).toDouble()).toList();
         } else {
           if (kDebugMode) {
-            print(
-              "VisualizerService: Received unexpected sample type: ${samples.runtimeType}",
-            );
+            print("VisualizerService: Received unexpected sample type: ${samples.runtimeType}");
           }
           return;
         }
-        sendUdpToDevices(
-          targetDevices: _devices
-              .where((d) => d.isEffectEnabled == true)
-              .toList(),
+        
+        // Use enhanced processing for Android too
+        sendUdpToDevicesEnhanced(
+          targetDevices: _devices.where((d) => d.isEffectEnabled == true).toList(),
           fft: Float32List.fromList(doubleSamples),
         );
+        
         if (_currentSelectedTab == 2) {
-          simulatorPageData(_devices[0], Float32List.fromList(doubleSamples));
+          simulatorPageDataEnhanced(_devices[0], Float32List.fromList(doubleSamples));
         }
       },
       onError: (error) {
@@ -546,14 +635,17 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   Future<void> _startMicLinux() async {
-    try {
+      try {
       await _recorder.init(
         format: PCMFormat.f32le,
         sampleRate: 44100,
         channels: RecorderChannels.mono,
       );
-      _recorder.setFftSmoothing(0.1);
-
+      
+      // Enhanced settings for better FFT quality
+      _recorder.setFftSmoothing(0.05); // Less smoothing for more responsiveness
+      // _recorder.setFftSize(2048); // Larger FFT for better frequency resolution
+      
       _recorder.start();
       _recorder.startStreamingData();
 
@@ -562,12 +654,14 @@ class VisualizerProvider with ChangeNotifier {
 
         final Float32List fft = _recorder.getFft();
 
-        sendUdpToDevices(
+        // Use enhanced audio processing
+        sendUdpToDevicesEnhanced(
           targetDevices: _devices.where((d) => d.isEffectEnabled).toList(),
           fft: fft,
         );
+        
         if (_currentSelectedTab == 2) {
-          simulatorPageData(_devices[0], fft);
+          simulatorPageDataEnhanced(_devices[0], fft);
         }
       });
     } catch (e) {
@@ -576,4 +670,47 @@ class VisualizerProvider with ChangeNotifier {
       }
     }
   }
+
+  // Get audio analysis statistics (for UI display)
+  Map<String, dynamic> getAudioStats(Float32List fft) {
+    if (fft.isEmpty) return {};
+    
+    final features = _audioAnalyzer.analyzeAudio(fft, 44100.0);
+    
+    return {
+      'tempo': features.tempo.toStringAsFixed(1),
+      'beatConfidence': (features.beatConfidence * 100).toStringAsFixed(1),
+      'spectralCentroid': (features.spectralCentroid / 1000).toStringAsFixed(2), // in kHz
+      'adaptiveGain': features.adaptiveGain.toStringAsFixed(2),
+      'harmonicity': (features.harmonicity * 100).toStringAsFixed(1),
+      'energyVariance': features.energyVariance.toStringAsFixed(3),
+      'bass': (features.bass * 100).toStringAsFixed(1),
+      'mid': (features.mid * 100).toStringAsFixed(1),
+      'treble': (features.treble * 100).toStringAsFixed(1),
+      'volume': (features.volumeNormalized * 100).toStringAsFixed(1),
+    };
+  }
+}
+
+// Helper function for HSV to RGB conversion (same as before but make sure it's accessible)
+List<int> _hsvToRgb(double h, double s, double v) {
+  h = h.clamp(0.0, 1.0);
+  s = s.clamp(0.0, 1.0);
+  v = v.clamp(0.0, 1.0);
+  int i = (h * 6).floor();
+  double f = h * 6 - i;
+  double p = v * (1 - s);
+  double q = v * (1 - f * s);
+  double t = v * (1 - (1 - f) * s);
+  double r, g, b;
+  switch (i % 6) {
+    case 0: r = v; g = t; b = p; break;
+    case 1: r = q; g = v; b = p; break;
+    case 2: r = p; g = v; b = t; break;
+    case 3: r = p; g = q; b = v; break;
+    case 4: r = t; g = p; b = v; break;
+    case 5: r = v; g = p; b = q; break;
+    default: r = g = b = 0;
+  }
+  return [(r * 255).round(), (g * 255).round(), (b * 255).round()];
 }

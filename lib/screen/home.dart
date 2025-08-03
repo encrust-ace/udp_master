@@ -169,17 +169,16 @@ class _HomeState extends State<Home> {
           elevation: 4,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           margin: const EdgeInsets.symmetric(vertical: 8),
-          child: Padding(
-            padding: const EdgeInsets.all(18.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Device Info
-                Expanded(child: _buildDeviceDetails(context, device)),
-                const SizedBox(width: 12),
-                _buildDeviceControls(context, device),
-              ],
+          child: ExpansionTile(
+            leading: Icon(Icons.lightbulb, size: 16),
+            title: Text(
+              device.name,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
+            children: [
+              // Device Info
+              _buildDeviceDetails(context, device),
+            ],
           ),
         ),
       ),
@@ -209,40 +208,29 @@ class _HomeState extends State<Home> {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.lightbulb, size: 16, color: theme.primary),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                device.name,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        infoRow(Icons.lan, device.ip),
-        infoRow(Icons.settings_ethernet, 'PORT: ${device.port}'),
-        infoRow(Icons.linear_scale, 'LEDs: ${device.ledCount}'),
-        infoRow(Icons.category, device.type.name),
-      ],
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0, bottom: 8, left: 16, right: 16),
+      child: Column(
+        spacing: 4,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          infoRow(Icons.lan, device.ip),
+          infoRow(Icons.settings_ethernet, 'PORT: ${device.port}'),
+          infoRow(Icons.linear_scale, 'LEDs: ${device.ledCount}'),
+          infoRow(Icons.category, device.type.name),
+          SizedBox(height: 8),
+          _buildDeviceControls(context, device),
+        ],
+      ),
     );
   }
 
   Widget _buildDeviceControls(BuildContext context, LedDevice device) {
     final effects = widget.visualizerProvider.effects;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    return Row(
+      spacing: 8,
       children: [
-        SizedBox(
-          width: 180,
-          height: 44,
+        Expanded(
           child: DropdownButtonFormField<String>(
             value: device.effect,
             decoration: InputDecoration(
@@ -273,42 +261,37 @@ class _HomeState extends State<Home> {
             },
           ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            FilledButton(
-              onPressed: () {
-                showDialog(
-                  barrierDismissible: false,
-                  useSafeArea: true,
-                  context: context,
-                  builder: (_) => Dialog(
-                    child: AddDevice(
-                      visualizerProvider: widget.visualizerProvider,
-                      device: device,
-                      action: DeviceAction.update,
-                    ),
-                  ),
-                );
-              },
-              child: const Icon(Icons.edit_note, size: 26),
-            ),
-            const SizedBox(width: 8),
-            FilledButton(
-              onPressed: () {
-                widget.visualizerProvider.deviceActions(
-                  device.copyWith(isEffectEnabled: !device.isEffectEnabled),
-                  DeviceAction.update,
-                );
-              },
-              child: Icon(
-                device.isEffectEnabled
-                    ? Icons.pause_circle_filled
-                    : Icons.play_circle_fill,
-                size: 26,
+
+        FilledButton(
+          onPressed: () {
+            showDialog(
+              barrierDismissible: false,
+              useSafeArea: true,
+              context: context,
+              builder: (_) => Dialog(
+                child: AddDevice(
+                  visualizerProvider: widget.visualizerProvider,
+                  device: device,
+                  action: DeviceAction.update,
+                ),
               ),
-            ),
-          ],
+            );
+          },
+          child: const Icon(Icons.edit_note, size: 26),
+        ),
+        FilledButton(
+          onPressed: () {
+            widget.visualizerProvider.deviceActions(
+              device.copyWith(isEffectEnabled: !device.isEffectEnabled),
+              DeviceAction.update,
+            );
+          },
+          child: Icon(
+            device.isEffectEnabled
+                ? Icons.pause_circle_filled
+                : Icons.play_circle_fill,
+            size: 26,
+          ),
         ),
       ],
     );
