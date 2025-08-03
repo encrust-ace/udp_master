@@ -14,6 +14,7 @@ import 'package:udp_master/effects/center_pulse.dart';
 import 'package:udp_master/effects/music_rhythm.dart';
 import 'package:udp_master/effects/volume_bars.dart';
 import 'package:udp_master/models.dart';
+import 'package:udp_master/services/audio_analyzer.dart';
 import 'package:udp_master/udp_sender.dart';
 
 typedef EffectRenderFunction =
@@ -36,6 +37,7 @@ class VisualizerProvider with ChangeNotifier {
 
   VisualizerProvider._internal();
 
+  final AudioAnalyzer _audioAnalyzer = AudioAnalyzer();
   CastMode _castMode = CastMode.audio;
   CastMode get castMode => _castMode;
   set castMode(CastMode value) {
@@ -168,7 +170,8 @@ class VisualizerProvider with ChangeNotifier {
                 fft: fft,
                 gain: effect.parameters["gain"]?["value"] ?? 2.0,
                 brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-                saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+                saturation: effect.parameters["saturation"]?["value"] ?? 1.0, 
+                analyzer: _audioAnalyzer,
               );
               break;
             case 'center-pulse':
@@ -207,6 +210,7 @@ class VisualizerProvider with ChangeNotifier {
                 gain: effect.parameters["gain"]?["value"] ?? 2.0,
                 brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
                 saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+                analyzer: _audioAnalyzer,
               );
               break;
             default:
@@ -252,6 +256,7 @@ class VisualizerProvider with ChangeNotifier {
           gain: effect.parameters["gain"]?["value"] ?? 2.0,
           brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
           saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+          analyzer: _audioAnalyzer,
         );
         break;
       case 'center-pulse':
