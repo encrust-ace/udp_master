@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:udp/udp.dart';
 import 'package:udp_master/models.dart'; // Your existing models.dart file
 import 'package:udp_master/services/udp_sender.dart';
 import 'dart:async';
@@ -89,11 +88,7 @@ class _DeviceControlScreenState extends State<DeviceControlScreen>
 
   Future<void> sendUdpCommand(dynamic data, LedDevice device) async {
     try {
-      final target = Endpoint.unicast(
-        InternetAddress(device.ip),
-        port: Port(device.port),
-      );
-      await _udpSender.udpInstance?.send(data, target);
+      _udpSender.send(device, data);
     } catch (e) {
       if (kDebugMode) {
         print("Failed to send UDP command: $e");
@@ -115,7 +110,7 @@ class _DeviceControlScreenState extends State<DeviceControlScreen>
     WidgetsBinding.instance.removeObserver(this);
     _cleanupTimers();
     _udpSubscription?.cancel();
-    _udpSender.udpInstance?.close();
+    _udpSender.close();
     super.dispose();
   }
 
@@ -167,16 +162,29 @@ class _DeviceControlScreenState extends State<DeviceControlScreen>
     }
   }
 
-  void _setupUdpListener() {
+  void _setupUdpListener() async {
+    // Close previous subscription if any
     _udpSubscription?.cancel();
-    _udpSubscription = _udpSender.udpInstance?.asStream().listen(
-      (datagram) => _handleUdpResponse(datagram),
+
+    // Ensure UDP socket is initialized
+    final socket = _udpSender.udpSocket;
+    if (socket == null) return;
+
+    // Set up UDP socket listener directly
+    socket.listen(
+      (RawSocketEvent event) {
+        if (event == RawSocketEvent.read) {
+          final datagram = socket.receive();
+          _handleUdpResponse(datagram);
+        }
+      },
       onError: (error) {
         if (kDebugMode) {
           print("UDP stream error: $error");
         }
         _handleConnectionError();
       },
+      cancelOnError: false,
     );
   }
 
@@ -354,14 +362,9 @@ class _DeviceControlScreenState extends State<DeviceControlScreen>
     if (!_isConnected) return;
 
     try {
-      final target = Endpoint.unicast(
-        InternetAddress(_device.ip),
-        port: Port(_device.port),
-      );
-
       final Map<String, dynamic> request = {"method": "getPilot", "params": {}};
       final List<int> message = utf8.encode(jsonEncode(request));
-      await _udpSender.udpInstance?.send(message, target);
+      _udpSender.send(_device, message);
     } catch (e) {
       if (kDebugMode) {
         print("Failed to request device status: $e");

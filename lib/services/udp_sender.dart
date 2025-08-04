@@ -1,16 +1,23 @@
-import 'package:udp/udp.dart';
+import 'dart:io';
+
+import 'package:udp_master/models.dart';
 
 class UdpSender {
-  UDP? _udpInstance; // Persistent UDP sender
+  RawDatagramSocket? _udpSocket; // Persistent UDP sender
 
-  UDP? get udpInstance => _udpInstance;
+  RawDatagramSocket? get udpSocket => _udpSocket;
 
   Future<void> initiateUDPSender() async {
-    _udpInstance = await UDP.bind(Endpoint.any());
+    // Bind to any port and address.
+    _udpSocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+  }
+
+  void send(LedDevice device, List<int> buffer) {
+    _udpSocket?.send(buffer, InternetAddress(device.ip), device.port,);
   }
 
   void close() {
-    _udpInstance?.close();
-    _udpInstance = null; // Clear the instance
+    _udpSocket?.close();
+    _udpSocket = null; // Clear the instance
   }
 }

@@ -85,18 +85,13 @@ class BroadcastProtocol {
         if (evt == RawSocketEvent.read) {
           Datagram? packet = datagramSocket.receive();
 
-          debugPrint('Received Wiz packet: ${packet != null}');
-
           if (packet != null) {
             try {
               final Map resp = json.decode(utf8.decode(packet.data));
+              debugPrint(resp.toString());
 
               if (resp.keys.contains('result')) {
                 final String mac = resp['result']['mac'];
-
-                debugPrint(
-                  "Found bulb with IP: ${packet.address.address} and MAC: $mac",
-                );
                 _registry.register(
                   DiscoveredDevice(packet.address.address, mac),
                 );

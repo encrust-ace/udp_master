@@ -9,7 +9,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:udp/udp.dart';
 import 'package:udp_master/effects/center_pulse.dart';
 import 'package:udp_master/effects/music_rhythm.dart';
 import 'package:udp_master/effects/vertical_bars.dart';
@@ -201,9 +200,7 @@ class VisualizerProvider with ChangeNotifier {
     });
     _effects[index] = effect;
     final prefs = await SharedPreferences.getInstance();
-    final effectList = _effects
-        .map((e) => json.encode(e.toJson()))
-        .toList();
+    final effectList = _effects.map((e) => json.encode(e.toJson())).toList();
     await prefs.setStringList('effects', effectList);
     notifyListeners();
     return true;
@@ -228,7 +225,7 @@ class VisualizerProvider with ChangeNotifier {
         .toList();
     await prefs.setStringList('effects', effectList);
     _effects = existingEffects;
-     notifyListeners();
+    notifyListeners();
     return true;
   }
 
@@ -237,7 +234,7 @@ class VisualizerProvider with ChangeNotifier {
     required List<LedDevice> targetDevices,
     required AudioFeatures features,
   }) async {
-    if (_udpSender.udpInstance == null) {
+    if (_udpSender.udpSocket == null) {
       if (kDebugMode) {
         print("VisualizerService: UDP sender not initialized.");
       }
@@ -245,11 +242,6 @@ class VisualizerProvider with ChangeNotifier {
     }
 
     for (var device in targetDevices) {
-      final target = Endpoint.unicast(
-        InternetAddress(device.ip),
-        port: Port(device.port),
-      );
-
       try {
         if (device.type == DeviceType.wled ||
             device.type == DeviceType.esphome) {
@@ -287,7 +279,7 @@ class VisualizerProvider with ChangeNotifier {
           }
 
           if (packetData.isNotEmpty) {
-            _udpSender.udpInstance?.send(packetData, target);
+            _udpSender.send(device, packetData);
           }
         }
       } catch (e) {
@@ -548,7 +540,7 @@ class VisualizerProvider with ChangeNotifier {
   Future<void> _stopVisualizer() async {
     if (!_isRunning &&
         _micSubscription == null &&
-        _udpSender.udpInstance == null) {
+        _udpSender.udpSocket == null) {
       return;
     }
 
