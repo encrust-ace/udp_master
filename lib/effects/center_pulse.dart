@@ -1,79 +1,46 @@
-import 'dart:typed_data';
-
 import 'package:udp_master/models.dart';
+import 'package:udp_master/services/audio_analyzer.dart';
 
-List<int> _hsvToRgb(double h, double s, double v) {
-  h = h.clamp(0.0, 1.0);
-  s = s.clamp(0.0, 1.0);
-  v = v.clamp(0.0, 1.0);
-  int i = (h * 6).floor();
-  double f = h * 6 - i;
-  double p = v * (1 - s);
-  double q = v * (1 - f * s);
-  double t = v * (1 - (1 - f) * s);
-  double r, g, b;
-  switch (i % 6) {
-    case 0:
-      r = v;
-      g = t;
-      b = p;
-      break;
-    case 1:
-      r = q;
-      g = v;
-      b = p;
-      break;
-    case 2:
-      r = p;
-      g = v;
-      b = t;
-      break;
-    case 3:
-      r = p;
-      g = q;
-      b = v;
-      break;
-    case 4:
-      r = t;
-      g = p;
-      b = v;
-      break;
-    case 5:
-      r = v;
-      g = p;
-      b = q;
-      break;
-    default:
-      r = g = b = 0;
-  }
-  return [(r * 255).round(), (g * 255).round(), (b * 255).round()];
-}
+final AutoGainController agcCenter = AutoGainController();
 
 List<int> renderCenterPulsePacket({
   required LedDevice device,
-  required Float32List fft,
+  required AudioFeatures features,
   required double gain,
+  required double saturation,
+  required double brightness,
 }) {
-  List<int> packet = [0x02, 0x02];
-  double sum = 0;
-  for (final value in fft) {
-    sum += value.abs();
-  }
+  final List<int> packet = [0x02, 0x02];
 
-  double avg = sum / fft.length;
-  double normalized = (avg * gain).clamp(0.0, 1.0);
-  double half = device.ledCount / 2;
-  double spread = normalized * half;
-  double hue = (1.0 - spread) * 0.7; // high intensity = red
+  // Auto-gain: use AGC if gain is 0
+  final double effectiveGain = gain == 0.0
+      ? agcCenter.computeGain(features.bassEnergy)
+      : gain;
+
+  // Use bassEnergy to determine pulse spread
+  final double rawStrength = (features.bassEnergy * effectiveGain).clamp(
+    0.0,
+    1.0,
+  );
+
+  final double half = device.ledCount / 2;
+  final double spread = rawStrength * half;
+
+  final double hue = (features.hue % 360) / 360;
+  final double beatBoost = features.isBeat ? 1.2 : 1.0;
+
   for (int i = 0; i < device.ledCount; i++) {
-    double dist = (i - half + 0.5).abs(); // for even counts
+    final double dist = (i - half + 0.5).abs(); // symmetrical from center
+
     if (dist < spread) {
-      double intensity = (1.0 - (dist / spread)).clamp(0.0, 1.0);
-      var rgb = _hsvToRgb(hue, 1.0, intensity);
+      final double intensity =
+          ((1.0 - (dist / spread)) * beatBoost * brightness).clamp(0.0, 1.0);
+      final rgb = hsvToRgb(hue, saturation, intensity);
       packet.addAll(rgb);
     } else {
       packet.addAll([0, 0, 0]);
     }
   }
+
   return packet;
 }

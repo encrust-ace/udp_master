@@ -98,7 +98,9 @@ class LedEffect {
     return LedEffect(
       id: json['id'],
       name: json['name'],
-      parameters: json['parameters'],
+      parameters: (json['parameters'] as Map<String, dynamic>).map(
+        (k, v) => MapEntry(k, Map<String, dynamic>.from(v as Map)),
+      ),
     );
   }
 

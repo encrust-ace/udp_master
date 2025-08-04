@@ -12,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp/udp.dart';
 import 'package:udp_master/effects/center_pulse.dart';
 import 'package:udp_master/effects/music_rhythm.dart';
-import 'package:udp_master/effects/volume_bars.dart';
+import 'package:udp_master/effects/vertical_bars.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/services/audio_analyzer.dart';
 import 'package:udp_master/udp_sender.dart';
@@ -31,7 +31,6 @@ const EventChannel _micStreamChannel = EventChannel('mic_stream');
 class VisualizerProvider with ChangeNotifier {
   static final VisualizerProvider _instance = VisualizerProvider._internal();
   final UdpSender _udpSender = UdpSender();
-    final AudioAnalyzer _audioAnalyzer = AudioAnalyzer();
 
   factory VisualizerProvider() {
     return _instance;
@@ -75,90 +74,105 @@ class VisualizerProvider with ChangeNotifier {
   // Updated effects list with new advanced effects
   List<LedEffect> _effects = [
     LedEffect(
-      id: 'energy',
-      name: 'Energy',
+      id: 'vertical-bars',
+      name: 'vertical Bars',
       parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
-        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-      },
-    ),
-    LedEffect(
-      id: 'scroll',
-      name: 'Scroll',
-      parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
-        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-        'speed': {'min': 0.1, 'max': 3.0, 'value': 1.0, 'steps': 10},
-      },
-    ),
-    LedEffect(
-      id: 'wavelength',
-      name: 'Wavelength',
-      parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
-        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-      },
-    ),
-    LedEffect(
-      id: 'spectrum',
-      name: 'Spectrum Analyzer',
-      parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
-        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-      },
-    ),
-    LedEffect(
-      id: 'beat-pulse',
-      name: 'Beat Pulse',
-      parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
-        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-      },
-    ),
-    LedEffect(
-      id: 'advanced-rhythm',
-      name: 'Advanced Rhythm',
-      parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 2.0, 'steps': 8},
-        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-        'raiseSpeed': {'min': 5.0, 'max': 30.0, 'value': 12.5, 'steps': 10},
-        'decaySpeed': {'min': 0.3, 'max': 1.0, 'value': 0.5, 'steps': 7},
-        'dropSpeed': {'min': 0.1, 'max': 1.0, 'value': 0.5, 'steps': 9},
-      },
-    ),
-    // Keep your existing effects for compatibility
-    LedEffect(
-      id: 'volume-bars',
-      name: 'Volume Bars (Legacy)',
-      parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 1.0, 'steps': 8},
-        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
+        'gain': {
+          'min': 0.0,
+          'max': 5.0,
+          'value': 0.0,
+          'steps': 10,
+          'default': 0.0,
+        },
+        'brightness': {
+          'min': 0.0,
+          'max': 1.0,
+          'value': 1.0,
+          'steps': 10,
+          'default': 1.0,
+        },
+        'saturation': {
+          'min': 0.0,
+          'max': 1.0,
+          'value': 1.0,
+          'steps': 10,
+          'default': 1.0,
+        },
       },
     ),
     LedEffect(
       id: 'center-pulse',
-      name: 'Center Pulse (Legacy)',
+      name: 'Center Pulse',
       parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 1.0, 'steps': 8},
+        'gain': {
+          'min': 0.0,
+          'max': 5.0,
+          'value': 0.0,
+          'steps': 10,
+          'default': 0.0,
+        },
+        'brightness': {
+          'min': 0.0,
+          'max': 1.0,
+          'value': 1.0,
+          'steps': 10,
+          'default': 1.0,
+        },
+        'saturation': {
+          'min': 0.0,
+          'max': 1.0,
+          'value': 1.0,
+          'steps': 10,
+          'default': 1.0,
+        },
       },
     ),
     LedEffect(
       id: 'music-rhythm',
-      name: 'Music Rhythm (Legacy)',
+      name: 'Music Rhythm',
       parameters: {
-        'gain': {'min': 1.0, 'max': 5.0, 'value': 1.0, 'steps': 8},
-        'brightness': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-        'saturation': {'min': 0.0, 'max': 1.0, 'value': 1.0, 'steps': 10},
-        'raiseSpeed': {'min': 5.0, 'max': 30.0, 'value': 12.5, 'steps': 10},
-        'decaySpeed': {'min': 0.3, 'max': 1.0, 'value': 0.5, 'steps': 7},
-        'dropSpeed': {'min': 0.1, 'max': 1.0, 'value': 0.5, 'steps': 9},
+        'gain': {
+          'min': 0.0,
+          'max': 5.0,
+          'value': 0.0,
+          'steps': 10,
+          'default': 0.0,
+        },
+        'brightness': {
+          'min': 0.0,
+          'max': 1.0,
+          'value': 1.0,
+          'steps': 10,
+          'default': 1.0,
+        },
+        'saturation': {
+          'min': 0.0,
+          'max': 1.0,
+          'value': 1.0,
+          'steps': 10,
+          'default': 1.0,
+        },
+        'raiseSpeed': {
+          'min': 5.0,
+          'max': 30.0,
+          'value': 12.5,
+          'steps': 10,
+          'default': 12.5,
+        },
+        'decaySpeed': {
+          'min': 0.3,
+          'max': 1.0,
+          'value': 0.5,
+          'steps': 7,
+          'default': 0.5,
+        },
+        'dropSpeed': {
+          'min': 0.1,
+          'max': 1.0,
+          'value': 0.5,
+          'steps': 9,
+          'default': 0.5,
+        },
       },
     ),
   ];
@@ -175,6 +189,24 @@ class VisualizerProvider with ChangeNotifier {
       // Should ideally not happen if _effects is never empty and first is valid
       return _effects.first;
     }
+  }
+
+  Future<bool> resetEffect(LedEffect effect) async {
+    int index = _effects.indexWhere((e) => e.id == effect.id);
+    if (index == -1) {
+      return false;
+    }
+    effect.parameters.forEach((key, value) {
+      value["value"] = value["default"];
+    });
+    _effects[index] = effect;
+    final prefs = await SharedPreferences.getInstance();
+    final effectList = _effects
+        .map((e) => json.encode(e.toJson()))
+        .toList();
+    await prefs.setStringList('effects', effectList);
+    notifyListeners();
+    return true;
   }
 
   Future<bool> updateEffect(
@@ -195,15 +227,15 @@ class VisualizerProvider with ChangeNotifier {
         .map((e) => json.encode(e.toJson()))
         .toList();
     await prefs.setStringList('effects', effectList);
-    notifyListeners();
     _effects = existingEffects;
+     notifyListeners();
     return true;
   }
 
   // Enhanced UDP sending function
-  Future<void> sendUdpToDevicesEnhanced({
+  Future<void> sendUdpToDevices({
     required List<LedDevice> targetDevices,
-    required Float32List fft,
+    required AudioFeatures features,
   }) async {
     if (_udpSender.udpInstance == null) {
       if (kDebugMode) {
@@ -212,9 +244,6 @@ class VisualizerProvider with ChangeNotifier {
       return;
     }
 
-    // Analyze audio once for all devices
-    final AudioFeatures features = _audioAnalyzer.analyzeAudio(fft, 44100.0);
-
     for (var device in targetDevices) {
       final target = Endpoint.unicast(
         InternetAddress(device.ip),
@@ -222,95 +251,44 @@ class VisualizerProvider with ChangeNotifier {
       );
 
       try {
-        if (device.type == DeviceType.wled || device.type == DeviceType.esphome) {
+        if (device.type == DeviceType.wled ||
+            device.type == DeviceType.esphome) {
           LedEffect effect = getEffectById(device.effect);
           late List<int> packetData;
-          
+
           // Use enhanced effects for new effect types
-          if (['energy', 'scroll', 'wavelength', 'spectrum', 'beat-pulse', 'advanced-rhythm'].contains(effect.id)) {
-            packetData = renderEnhancedEffect(
+          if (effect.id == 'vertical-bars') {
+            packetData = renderVerticalBars(
               device: device,
               features: features,
-              effectId: effect.id,
-              parameters: effect.parameters,
+              gain: effect.parameters["gain"]?["value"] ?? 0.0,
+              brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+              saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
             );
-          } else {
-            // Fallback to legacy effects
-            switch (effect.id) {
-              case 'volume-bars':
-                packetData = renderVerticalBars(
-                  device: device,
-                  fft: fft,
-                  gain: effect.parameters["gain"]?["value"] ?? 2.0,
-                  brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-                  saturation: effect.parameters["saturation"]?["value"] ?? 1.0, 
-                  analyzer: _audioAnalyzer,
-                );
-                break;
-              case 'center-pulse':
-                packetData = renderCenterPulsePacket(
-                  device: device,
-                  fft: fft,
-                  gain: effect.parameters["gain"]?["value"] ?? 2.0,
-                );
-                break;
-              case 'music-rhythm':
-                packetData = renderBeatDropEffect(
-                  device: device,
-                  fft: fft,
-                  gain: effect.parameters["gain"]?["value"] ?? 2.0,
-                  brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-                  saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-                  raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 10.0,
-                  decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 1.0,
-                  dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
-                );
-                break;
-              default:
-                continue;
-            }
+          } else if (effect.id == 'center-pulse') {
+            packetData = renderCenterPulsePacket(
+              device: device,
+              features: features,
+              gain: effect.parameters["gain"]?["value"] ?? 0.0,
+              brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+              saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+            );
+          } else if (effect.id == 'music-rhythm') {
+            packetData = renderBeatDropEffect(
+              device: device,
+              features: features,
+              gain: effect.parameters["gain"]?["value"] ?? 0.0,
+              brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+              saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+              raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 12.5,
+              decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 0.5,
+              dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
+            );
           }
-          
+
           if (packetData.isNotEmpty) {
             _udpSender.udpInstance?.send(packetData, target);
           }
-        } else if (device.type == DeviceType.wiz) {
-          // For WiZ devices, use enhanced analysis but simple color output
-          LedEffect effect = getEffectById(device.effect);
-          
-          // Calculate color based on enhanced audio features
-          double intensity = (features.bass * 0.4 + features.mid * 0.4 + features.treble * 0.2);
-          intensity *= effect.parameters["gain"]?["value"] ?? 2.0;
-          intensity *= features.adaptiveGain;
-          intensity *= (1.0 + features.beatStrength * 0.5);
-          intensity = intensity.clamp(0.0, 1.0);
-          
-          // Dynamic color based on spectral centroid
-          double hue = (features.spectralCentroid / 8000.0).clamp(0.0, 1.0);
-          hue = 0.7 - hue * 0.4; // Map to red-blue range
-          
-          final brightness = effect.parameters["brightness"]?["value"] ?? 1.0;
-          final saturation = effect.parameters["saturation"]?["value"] ?? 1.0;
-          
-          final rgb = _hsvToRgb(hue, saturation, intensity * brightness);
-          final r = rgb[0];
-          final g = rgb[1];
-          final b = rgb[2];
-          final dimming = (intensity * brightness * 100).round();
-
-          final data = {
-            "method": "setPilot",
-            "params": {
-              "state": dimming > 10,
-              "r": r.clamp(0, 255),
-              "g": g.clamp(0, 255),
-              "b": b.clamp(0, 255),
-              "dimming": dimming.clamp(10, 100),
-            },
-          };
-
-          final message = utf8.encode(jsonEncode(data));
-          _udpSender.udpInstance?.send(message, target);
         }
       } catch (e) {
         if (kDebugMode) {
@@ -320,59 +298,44 @@ class VisualizerProvider with ChangeNotifier {
     }
   }
 
-   // Enhanced simulator page data
-  Future<void> simulatorPageDataEnhanced(LedDevice device, Float32List fft) async {
-    // Analyze audio with enhanced features
-    final AudioFeatures features = _audioAnalyzer.analyzeAudio(fft, 44100.0);
-    
+  // Enhanced simulator page data
+  Future<void> simulatorPageDataEnhanced(
+    LedDevice device,
+    AudioFeatures features,
+  ) async {
     LedEffect effect = getEffectById(device.effect);
     late List<int> packetData;
-    
+
     // Use enhanced effects for new effect types
-    if (['energy', 'scroll', 'wavelength', 'spectrum', 'beat-pulse', 'advanced-rhythm'].contains(effect.id)) {
-      packetData = renderEnhancedEffect(
+    if (effect.id == 'vertical-bars') {
+      packetData = renderVerticalBars(
         device: device,
         features: features,
-        effectId: effect.id,
-        parameters: effect.parameters,
+        gain: effect.parameters["gain"]?["value"] ?? 0.0,
+        brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+        saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
       );
-    } else {
-      // Fallback to legacy effects for compatibility
-      switch (effect.id) {
-        case 'volume-bars':
-          packetData = renderVerticalBars(
-            device: device,
-            fft: fft,
-            gain: effect.parameters["gain"]?["value"] ?? 2.0,
-            brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-            saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-            analyzer: _audioAnalyzer
-          );
-          break;
-        case 'center-pulse':
-          packetData = renderCenterPulsePacket(
-            device: device,
-            fft: fft,
-            gain: effect.parameters["gain"]?["value"] ?? 2.0,
-          );
-          break;
-        case 'music-rhythm':
-          packetData = renderBeatDropEffect(
-            device: device,
-            fft: fft,
-            gain: effect.parameters["gain"]?["value"] ?? 2.0,
-            brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-            saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-            raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 10.0,
-            decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 1.0,
-            dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
-          );
-          break;
-        default:
-          packetData = [];
-      }
+    } else if (effect.id == 'center-pulse') {
+      packetData = renderCenterPulsePacket(
+        device: device,
+        features: features,
+        gain: effect.parameters["gain"]?["value"] ?? 0.0,
+        brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+        saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+      );
+    } else if (effect.id == 'music-rhythm') {
+      packetData = renderBeatDropEffect(
+        device: device,
+        features: features,
+        gain: effect.parameters["gain"]?["value"] ?? 0.0,
+        brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
+        saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
+        raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 12.5,
+        decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 0.5,
+        dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
+      );
     }
-    
+
     packets = packetData;
     notifyListeners();
   }
@@ -380,19 +343,38 @@ class VisualizerProvider with ChangeNotifier {
 
   Future<void> initiateTheAppData() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // restore devices
     final deviceList = prefs.getStringList('devices') ?? [];
     _devices = deviceList
         .map((e) => LedDevice.fromJson(json.decode(e)))
         .toList();
+
+    // restore last selected tab
     final currectSelectedTab = prefs.getInt('currentSelectedTab') ?? 0;
     _currentSelectedTab = currectSelectedTab;
+
+    // restore effects presets
+    final effectList = prefs.getStringList('effects') ?? [];
+    List<LedEffect> fetchedEffects = effectList
+        .map((e) => LedEffect.fromJson(json.decode(e)))
+        .toList();
+    for (var effect in fetchedEffects) {
+      int index = _effects.indexWhere((e) => e.id == effect.id);
+      if (index != -1) {
+        _effects[index] = effect;
+      }
+    }
+    // initialize udp
     _udpSender.initiateUDPSender();
     notifyListeners();
   }
 
   Future<void> _saveDevices() async {
     final prefs = await SharedPreferences.getInstance();
-    final deviceList = _devices.map((device) => json.encode(device.toJson())).toList();
+    final deviceList = _devices
+        .map((device) => json.encode(device.toJson()))
+        .toList();
     await prefs.setStringList('devices', deviceList);
     notifyListeners(); // Only notify when device list actually changes
   }
@@ -593,6 +575,12 @@ class VisualizerProvider with ChangeNotifier {
 
   Future<void> _startMicAndroid() async {
     await _platform.invokeMethod("startMic");
+
+    final AudioAnalyzer analyzer = AudioAnalyzer(
+      sampleRate: 44100,
+      fftSize: 1024,
+    );
+
     _micSubscription = _micStreamChannel.receiveBroadcastStream().listen(
       (samples) {
         if (!_isRunning || _devices.isEmpty) return;
@@ -602,67 +590,78 @@ class VisualizerProvider with ChangeNotifier {
           doubleSamples = samples.map((s) => (s as num).toDouble()).toList();
         } else {
           if (kDebugMode) {
-            print("VisualizerService: Received unexpected sample type: ${samples.runtimeType}");
+            print(
+              "VisualizerService: Unexpected sample type: ${samples.runtimeType}",
+            );
           }
           return;
         }
-        
-        // Use enhanced processing for Android too
-        sendUdpToDevicesEnhanced(
-          targetDevices: _devices.where((d) => d.isEffectEnabled == true).toList(),
-          fft: Float32List.fromList(doubleSamples),
+
+        final Float32List floatSamples = Float32List.fromList(doubleSamples);
+
+        // Use analyzer to extract FFT and volume features
+        final AudioFeatures features = analyzer.analyze(floatSamples);
+
+        // Send to devices
+        sendUdpToDevices(
+          targetDevices: _devices
+              .where((d) => d.isEffectEnabled == true)
+              .toList(),
+          features: features,
         );
-        
+
+        // Update simulator view if on tab 2
         if (_currentSelectedTab == 2) {
-          simulatorPageDataEnhanced(_devices[0], Float32List.fromList(doubleSamples));
+          simulatorPageDataEnhanced(_devices[0], features);
         }
       },
       onError: (error) {
-        if (kDebugMode) {
-          print("VisualizerService: Error on mic stream: $error");
-        }
+        if (kDebugMode) print("VisualizerService: Mic stream error: $error");
         _stopVisualizer();
       },
       onDone: () {
-        if (kDebugMode) {
-          print("VisualizerService: Mic stream done.");
-        }
-        if (_isRunning) {
-          _stopVisualizer();
-        }
+        if (kDebugMode) print("VisualizerService: Mic stream done.");
+        if (_isRunning) _stopVisualizer();
       },
     );
   }
 
   Future<void> _startMicLinux() async {
-      try {
+    try {
       await _recorder.init(
         format: PCMFormat.f32le,
         sampleRate: 44100,
         channels: RecorderChannels.mono,
       );
-      
+
       // Enhanced settings for better FFT quality
       _recorder.setFftSmoothing(0.05); // Less smoothing for more responsiveness
       // _recorder.setFftSize(2048); // Larger FFT for better frequency resolution
-      
+
       _recorder.start();
       _recorder.startStreamingData();
+
+      final AudioAnalyzer analyzer = AudioAnalyzer(
+        sampleRate: 44100,
+        fftSize: 1024,
+      );
 
       _micSubscription = _recorder.uint8ListStream.listen((_) {
         if (!_isRunning || _devices.isEmpty) return;
 
         final Float32List fft = _recorder.getFft();
 
+        final audioFeatures = analyzer.analyze(fft);
+
         // Use enhanced audio processing
-        sendUdpToDevicesEnhanced(
+        sendUdpToDevices(
           targetDevices: _devices.where((d) => d.isEffectEnabled).toList(),
-          fft: fft,
+          features: audioFeatures,
         );
-        
-        if (_currentSelectedTab == 2) {
-          simulatorPageDataEnhanced(_devices[0], fft);
-        }
+
+        // if (_currentSelectedTab == 2) {
+        //   simulatorPageDataEnhanced(_devices[0], );
+        // }
       });
     } catch (e) {
       if (kDebugMode) {
@@ -670,47 +669,4 @@ class VisualizerProvider with ChangeNotifier {
       }
     }
   }
-
-  // Get audio analysis statistics (for UI display)
-  Map<String, dynamic> getAudioStats(Float32List fft) {
-    if (fft.isEmpty) return {};
-    
-    final features = _audioAnalyzer.analyzeAudio(fft, 44100.0);
-    
-    return {
-      'tempo': features.tempo.toStringAsFixed(1),
-      'beatConfidence': (features.beatConfidence * 100).toStringAsFixed(1),
-      'spectralCentroid': (features.spectralCentroid / 1000).toStringAsFixed(2), // in kHz
-      'adaptiveGain': features.adaptiveGain.toStringAsFixed(2),
-      'harmonicity': (features.harmonicity * 100).toStringAsFixed(1),
-      'energyVariance': features.energyVariance.toStringAsFixed(3),
-      'bass': (features.bass * 100).toStringAsFixed(1),
-      'mid': (features.mid * 100).toStringAsFixed(1),
-      'treble': (features.treble * 100).toStringAsFixed(1),
-      'volume': (features.volumeNormalized * 100).toStringAsFixed(1),
-    };
-  }
-}
-
-// Helper function for HSV to RGB conversion (same as before but make sure it's accessible)
-List<int> _hsvToRgb(double h, double s, double v) {
-  h = h.clamp(0.0, 1.0);
-  s = s.clamp(0.0, 1.0);
-  v = v.clamp(0.0, 1.0);
-  int i = (h * 6).floor();
-  double f = h * 6 - i;
-  double p = v * (1 - s);
-  double q = v * (1 - f * s);
-  double t = v * (1 - (1 - f) * s);
-  double r, g, b;
-  switch (i % 6) {
-    case 0: r = v; g = t; b = p; break;
-    case 1: r = q; g = v; b = p; break;
-    case 2: r = p; g = v; b = t; break;
-    case 3: r = p; g = q; b = v; break;
-    case 4: r = t; g = p; b = v; break;
-    case 5: r = v; g = p; b = q; break;
-    default: r = g = b = 0;
-  }
-  return [(r * 255).round(), (g * 255).round(), (b * 255).round()];
 }

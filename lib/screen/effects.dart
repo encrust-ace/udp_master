@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:udp_master/models.dart';
 import 'package:udp_master/visualizer_provider.dart';
 
 class EffectsPage extends StatelessWidget {
   final VisualizerProvider visualizerProvider;
   const EffectsPage({super.key, required this.visualizerProvider});
+
+  Future<bool> resetEffect(LedEffect effect) {
+    final resp = visualizerProvider.resetEffect(effect);
+    return resp;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,14 +21,16 @@ class EffectsPage extends StatelessWidget {
 
         return Card(
           elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           margin: const EdgeInsets.symmetric(vertical: 8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 18.0),
+            padding: const EdgeInsets.symmetric(
+              vertical: 18.0,
+              horizontal: 18.0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+
               children: [
                 Row(
                   children: [
@@ -35,11 +43,15 @@ class EffectsPage extends StatelessWidget {
                     Expanded(
                       child: Text(
                         effect.name,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
+                        style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        resetEffect(effect);
+                      },
+                      icon: Icon(Icons.restore),
                     ),
                   ],
                 ),
@@ -51,6 +63,7 @@ class EffectsPage extends StatelessWidget {
                   final double max = value["max"];
                   final int steps = value["steps"] ?? 20;
                   final double currentValue = value["value"];
+                  final double defaultValue = value["default"];
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
@@ -71,6 +84,7 @@ class EffectsPage extends StatelessWidget {
                                 "max": max,
                                 "value": val,
                                 "steps": steps,
+                                "default": defaultValue,
                               });
                             },
                           ),
