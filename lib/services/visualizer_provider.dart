@@ -2,11 +2,14 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_recorder/flutter_recorder.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp_master/effects/center_pulse.dart';
@@ -689,7 +692,7 @@ class VisualizerProvider with ChangeNotifier {
         );
 
         if (_currentSelectedTab == 2) {
-           simulatorPageDataEnhanced(features, getEffectById(_globalEffectId));
+          simulatorPageDataEnhanced(features, getEffectById(_globalEffectId));
         }
       });
     } catch (e) {
@@ -697,5 +700,190 @@ class VisualizerProvider with ChangeNotifier {
         print("VisualizerService (Linux): Error starting mic: $e");
       }
     }
+  }
+
+  ///////
+  ///
+  GlobalKey? _videoKey;
+  MediaStream? _screenStream;
+  Timer? _screenTimer;
+  // Update the startScreenSync method to accept the GlobalKey
+  Future<void> startScreenSync(MediaStream stream, GlobalKey key) async {
+    _screenStream = stream;
+    _videoKey = key;
+    _isRunning = true;
+    _castMode = CastMode.video;
+
+    _screenTimer?.cancel();
+
+    // Set up a periodic timer to process the stream at ~20 FPS (50ms)
+    _screenTimer = Timer.periodic(const Duration(milliseconds: 50), (
+      timer,
+    ) async {
+      await _processFrameAndSend();
+    });
+
+    notifyListeners();
+  }
+
+  Future<void> stopScreenSync() async {
+    _screenTimer?.cancel();
+    _screenTimer = null;
+
+    _isRunning = false;
+    _screenStream?.dispose();
+    _screenStream = null;
+    _udpSender.close();
+    notifyListeners();
+  }
+
+  Future<void> _processFrameAndSend() async {
+    // Check if the key and devices are valid
+    if (_videoKey == null ||
+        _videoKey!.currentContext == null ||
+        _devices.isEmpty) {
+      return;
+    }
+
+    try {
+      RenderRepaintBoundary boundary =
+          _videoKey!.currentContext!.findRenderObject()
+              as RenderRepaintBoundary;
+
+      ui.Image image = await boundary.toImage();
+      ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      );
+
+      if (byteData == null) {
+        return;
+      }
+
+      Uint8List pixelData = byteData.buffer.asUint8List();
+      final int width = image.width;
+      final int height = image.height;
+
+      // Filter devices for left and right
+      final leftDevices = _devices.where(
+        (d) => d.name.toLowerCase().contains('2'),
+      );
+      final rightDevices = _devices.where(
+        (d) => d.name.toLowerCase().contains('1'),
+      );
+
+      // Process and send for all left-side devices
+      for (var device in leftDevices) {
+        final packetData = _renderScreenData(
+          device: device,
+          pixelData: pixelData,
+          width: width,
+          height: height,
+          side: 'left',
+        );
+        if (packetData.isNotEmpty) {
+          _udpSender.send(device, packetData);
+        }
+      }
+
+      // Process and send for all right-side devices
+      for (var device in rightDevices) {
+        final packetData = _renderScreenData(
+          device: device,
+          pixelData: pixelData,
+          width: width,
+          height: height,
+          side: 'right',
+        );
+        if (packetData.isNotEmpty) {
+          _udpSender.send(device, packetData);
+        }
+      }
+
+      image.dispose();
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error processing frame: $e");
+      }
+    }
+  }
+
+  // visualizer_provider.dart (add this to your member variables)
+  final Map<String, List<Color>> _previousColors = {};
+  // Updated _renderScreenData to handle smoothing and left/right sides
+  List<int> _renderScreenData({
+    required LedDevice device,
+    required Uint8List pixelData,
+    required int width,
+    required int height,
+    required String side,
+  }) {
+    final int count = device.ledCount;
+    if (count == 0) return [0x02, 0x04];
+
+    final List<int> packet = [0x02, 0x04];
+    final double smoothingFactor = 0.2; // Adjust for more or less smoothing
+
+    final int leftSectionWidth = (width * 0.1).round();
+
+    // Determine the xPosition based on the side
+    final int xPosition = side == 'left'
+        ? leftSectionWidth ~/ 2
+        : width - (leftSectionWidth ~/ 2);
+
+    // Initialize previous colors for this device if they don't exist
+    _previousColors[device.id] ??= List.generate(
+      count,
+      (index) => const Color(0x00000000),
+    );
+
+    for (int i = 0; i < count; i++) {
+      final int yPosition = ((height * (count - 1 - i)) / count).round();
+
+      if (xPosition < 0 ||
+          xPosition >= width ||
+          yPosition < 0 ||
+          yPosition >= height) {
+        packet.addAll([0, 0, 0]);
+        continue;
+      }
+
+      final int pixelIndex = (yPosition * width + xPosition) * 4;
+
+      if (pixelIndex + 3 < pixelData.length) {
+        // Get the new color from the screen
+        final int newR = pixelData[pixelIndex];
+        final int newG = pixelData[pixelIndex + 1];
+        final int newB = pixelData[pixelIndex + 2];
+
+        // Get the previous color for smoothing
+        final Color previousColor = _previousColors[device.id]![i];
+
+        // Perform exponential moving average (EMA) smoothing
+        final int r =
+            ((((previousColor.r * 255.0).round() & 0xff) *
+                        (1 - smoothingFactor)) +
+                    (newR * smoothingFactor))
+                .round();
+        final int g =
+            ((((previousColor.g * 255.0).round() & 0xff) *
+                        (1 - smoothingFactor)) +
+                    (newG * smoothingFactor))
+                .round();
+        final int b =
+            ((((previousColor.b * 255.0).round() & 0xff) *
+                        (1 - smoothingFactor)) +
+                    (newB * smoothingFactor))
+                .round();
+
+        packet.addAll([r, g, b]);
+
+        // Update the previous color for the next frame
+        _previousColors[device.id]![i] = Color.fromARGB(255, r, g, b);
+      } else {
+        packet.addAll([0, 0, 0]);
+      }
+    }
+
+    return packet;
   }
 }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:udp_master/screen/effects.dart';
 import 'package:udp_master/screen/home.dart';
 import 'package:udp_master/screen/simulator_page.dart';
+import 'package:udp_master/screen/screen_stream.dart';
 import 'package:udp_master/services/discover.dart';
 
 import 'services/visualizer_provider.dart';
@@ -61,6 +62,18 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
       appBar: AppBar(
         title: const Icon(Icons.lightbulb, size: 36),
         actions: [
+            IconButton(
+            onPressed: () => {
+               Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      ScreenCapturePage(),
+                ),
+              ),
+            },
+            icon: const Icon(Icons.video_call),
+          ),
           // Import/Export buttons
           IconButton(
             onPressed: () => _visualizerProvider.importDevicesFromJsonFile(),
