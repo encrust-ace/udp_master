@@ -5,7 +5,7 @@ import 'package:udp_master/screen/home.dart';
 import 'package:udp_master/screen/simulator_page.dart';
 import 'package:udp_master/services/discover.dart';
 
-import 'visualizer_provider.dart';
+import 'services/visualizer_provider.dart';
 
 void main() {
   runApp(
@@ -61,8 +61,17 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
       appBar: AppBar(
         title: const Icon(Icons.lightbulb, size: 36),
         actions: [
+          // Import/Export buttons
           IconButton(
-            iconSize: 36,
+            onPressed: () => _visualizerProvider.importDevicesFromJsonFile(),
+            icon: const Icon(Icons.download),
+          ),
+          IconButton(
+            onPressed: () =>
+                _visualizerProvider.exportDevicesToJsonFile(context),
+            icon: const Icon(Icons.upload),
+          ),
+          IconButton(
             onPressed: () {
               Navigator.push(
                 context,

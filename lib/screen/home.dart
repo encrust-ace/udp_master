@@ -5,7 +5,7 @@ import 'package:udp_master/models.dart';
 import 'package:udp_master/screen/add_device.dart';
 import 'package:udp_master/screen/device_details.dart';
 import 'package:udp_master/screen/wiz_screen.dart';
-import 'package:udp_master/visualizer_provider.dart';
+import 'package:udp_master/services/visualizer_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class Home extends StatefulWidget {
@@ -170,6 +170,7 @@ class _HomeState extends State<Home> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           margin: const EdgeInsets.symmetric(vertical: 8),
           child: ExpansionTile(
+            initiallyExpanded: true,
             leading: Icon(Icons.lightbulb, size: 16),
             title: Text(
               device.name,
@@ -188,36 +189,66 @@ class _HomeState extends State<Home> {
   Widget _buildDeviceDetails(BuildContext context, LedDevice device) {
     final theme = Theme.of(context).colorScheme;
 
-    Widget infoRow(IconData icon, String value) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Row(
-          children: [
-            Icon(icon, size: 16, color: theme.outline),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                value,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: theme.outline),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Padding(
       padding: const EdgeInsets.only(top: 8.0, bottom: 8, left: 16, right: 16),
       child: Column(
         spacing: 4,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          infoRow(Icons.lan, device.ip),
-          infoRow(Icons.settings_ethernet, 'PORT: ${device.port}'),
-          infoRow(Icons.linear_scale, 'LEDs: ${device.ledCount}'),
-          infoRow(Icons.category, device.type.name),
+          Row(
+            children: [
+              Icon(Icons.device_hub, size: 16, color: theme.outline),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  device.ip.toString(),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: theme.outline),
+                ),
+              ),
+
+              SizedBox(width: 16),
+              Icon(Icons.settings_ethernet, size: 16, color: theme.outline),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  device.port.toString(),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: theme.outline),
+                ),
+              ),
+            ],
+          ),
+
+          Row(
+            children: [
+              Icon(Icons.linear_scale, size: 16, color: theme.outline),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  device.ledCount.toString(),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: theme.outline),
+                ),
+              ),
+
+              SizedBox(width: 16),
+              Icon(Icons.category, size: 16, color: theme.outline),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  device.type.name.toString(),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: theme.outline),
+                ),
+              ),
+            ],
+          ),
+
           SizedBox(height: 8),
           _buildDeviceControls(context, device),
         ],

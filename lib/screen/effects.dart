@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:udp_master/models.dart';
-import 'package:udp_master/visualizer_provider.dart';
+import 'package:udp_master/services/visualizer_provider.dart';
 
 class EffectsPage extends StatelessWidget {
   final VisualizerProvider visualizerProvider;

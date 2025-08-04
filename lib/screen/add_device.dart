@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:udp_master/models.dart';
-import 'package:udp_master/visualizer_provider.dart';
+import 'package:udp_master/services/visualizer_provider.dart';
 
 class AddDevice extends StatefulWidget {
   final VisualizerProvider visualizerProvider;
@@ -40,7 +40,7 @@ class _AddDeviceState extends State<AddDevice> {
     _ledCountController.text = d.ledCount.toString();
     _portController.text = d.port.toString();
     _selectedDeviceType = d.type;
-    }
+  }
 
   @override
   void dispose() {
@@ -102,22 +102,6 @@ class _AddDeviceState extends State<AddDevice> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           spacing: 24,
           children: [
-            // Import/Export buttons
-            Row(
-              spacing: 12,
-              children: [
-                ElevatedButton(
-                  onPressed: () =>
-                      widget.visualizerProvider.importDevicesFromJsonFile(),
-                  child: const Text("Import Devices"),
-                ),
-                ElevatedButton(
-                  onPressed: () => widget.visualizerProvider
-                      .exportDevicesToJsonFile(context),
-                  child: const Text("Export Devices"),
-                ),
-              ],
-            ),
             // Name & LED count
             Row(
               spacing: 12,
@@ -192,60 +176,43 @@ class _AddDeviceState extends State<AddDevice> {
               ],
             ),
             // Device Type
-            Row(
-              spacing: 12,
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<DeviceType>(
-                    decoration: _inputDecoration(
-                      "Device Type",
-                      Icons.device_hub,
-                    ),
-                    value: _selectedDeviceType,
-                    items: DeviceType.values
-                        .map(
-                          (type) => DropdownMenuItem(
-                            value: type,
-                            child: Text(type.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          _selectedDeviceType = val;
-                          _portController.text = val.port.toString();
-                        });
-                      }
-                    },
-                    validator: (value) =>
-                        value == null ? 'Select device type' : null,
-                  ),
-                ),
-                Expanded(
-                  child: DropdownButtonFormField<LedEffect>(
-                    decoration: _inputDecoration("Effect", Icons.style),
-                    value: _selectedEffect,
-                    items: widget.visualizerProvider.effects
-                        .map(
-                          (type) => DropdownMenuItem(
-                            value: type,
-                            child: Text(type.name),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          _selectedEffect = val;
-                        });
-                      }
-                    },
-                    validator: (value) =>
-                        value == null ? 'Select device type' : null,
-                  ),
-                ),
-              ],
+            DropdownButtonFormField<LedEffect>(
+              decoration: _inputDecoration("Effect", Icons.style),
+              value: _selectedEffect,
+              items: widget.visualizerProvider.effects
+                  .map(
+                    (type) =>
+                        DropdownMenuItem(value: type, child: Text(type.name)),
+                  )
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedEffect = val;
+                  });
+                }
+              },
+              validator: (value) => value == null ? 'Select device type' : null,
+            ),
+
+            DropdownButtonFormField<DeviceType>(
+              decoration: _inputDecoration("Device Type", Icons.device_hub),
+              value: _selectedDeviceType,
+              items: DeviceType.values
+                  .map(
+                    (type) =>
+                        DropdownMenuItem(value: type, child: Text(type.name)),
+                  )
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedDeviceType = val;
+                    _portController.text = val.port.toString();
+                  });
+                }
+              },
+              validator: (value) => value == null ? 'Select device type' : null,
             ),
 
             // Actions

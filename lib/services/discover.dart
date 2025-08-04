@@ -5,7 +5,7 @@ import 'package:bonsoir/bonsoir.dart';
 import 'package:flutter/material.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/screen/add_device.dart';
-import 'package:udp_master/visualizer_provider.dart';
+import 'package:udp_master/services/visualizer_provider.dart';
 
 // Your discovery code - include these classes/functions
 const defaultWaitTime = 5;

@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:udp/udp.dart';
 import 'package:udp_master/models.dart'; // Your existing models.dart file
-import 'package:udp_master/udp_sender.dart';
+import 'package:udp_master/services/udp_sender.dart';
 import 'dart:async';
 
 const scenes = {

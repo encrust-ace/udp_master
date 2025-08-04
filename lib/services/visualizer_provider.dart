@@ -15,7 +15,7 @@ import 'package:udp_master/effects/music_rhythm.dart';
 import 'package:udp_master/effects/vertical_bars.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/services/audio_analyzer.dart';
-import 'package:udp_master/udp_sender.dart';
+import 'package:udp_master/services/udp_sender.dart';
 
 typedef EffectRenderFunction =
     List<int> Function({
@@ -75,7 +75,7 @@ class VisualizerProvider with ChangeNotifier {
   List<LedEffect> _effects = [
     LedEffect(
       id: 'vertical-bars',
-      name: 'vertical Bars',
+      name: 'Vertical Bars',
       parameters: {
         'gain': {
           'min': 0.0,

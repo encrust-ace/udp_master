@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/screen/led_strip_simulator.dart';
-import 'package:udp_master/visualizer_provider.dart';
+import 'package:udp_master/services/visualizer_provider.dart';
 
 class SimulatorPage extends StatefulWidget {
   final VisualizerProvider visualizerProvider;
