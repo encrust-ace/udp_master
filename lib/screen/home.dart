@@ -18,14 +18,14 @@ class Home extends StatefulWidget {
 }
 
 class _HomeState extends State<Home> {
-  late LedEffect _selectedGlobalEffect;
+  late String _selectedGlobalEffect;
   final List<String> _sortOptions = ['Name', 'IP'];
   String _selectedSortOption = 'Name';
 
   @override
   void initState() {
     super.initState();
-    _selectedGlobalEffect = widget.visualizerProvider.effects.first;
+    _selectedGlobalEffect = widget.visualizerProvider.globalEffectId;
   }
 
   Future<void> _launchUrl(LedDevice device) async {
@@ -36,13 +36,7 @@ class _HomeState extends State<Home> {
   }
 
   void _applyGlobalEffect(String effectId) {
-    final updatedDevices = widget.visualizerProvider.devices
-        .map((d) => d.copyWith(effect: effectId))
-        .toList();
-
-    for (var device in updatedDevices) {
-      widget.visualizerProvider.deviceActions(device, DeviceAction.update);
-    }
+    widget.visualizerProvider.setGlobalEffect(effectId);
   }
 
   List<LedDevice> _getSortedDevices() {
@@ -113,18 +107,13 @@ class _HomeState extends State<Home> {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.filter_vintage_outlined),
             ),
-            value: _selectedGlobalEffect.id,
+            value: _selectedGlobalEffect,
             items: widget.visualizerProvider.effects
                 .map((e) => DropdownMenuItem(value: e.id, child: Text(e.name)))
                 .toList(),
             onChanged: (newEffectId) {
               if (newEffectId != null) {
-                setState(
-                  () => _selectedGlobalEffect = widget
-                      .visualizerProvider
-                      .effects
-                      .firstWhere((e) => e.id == newEffectId),
-                );
+                setState(() => _selectedGlobalEffect = newEffectId);
                 _applyGlobalEffect(newEffectId);
               }
             },

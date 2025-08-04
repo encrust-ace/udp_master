@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:udp_master/models.dart';
 import 'package:udp_master/screen/led_strip_simulator.dart';
 import 'package:udp_master/services/visualizer_provider.dart';
 
@@ -13,22 +12,16 @@ class SimulatorPage extends StatefulWidget {
 }
 
 class _SimulatorPageState extends State<SimulatorPage> {
-  late LedEffect _selectedGlobalEffect;
+  late String _selectedGlobalEffectId;
 
   @override
   void initState() {
     super.initState();
-    _selectedGlobalEffect = widget.visualizerProvider.effects.first;
+    _selectedGlobalEffectId = widget.visualizerProvider.globalEffectId;
   }
 
   void _applyGlobalEffect(String effectId) {
-    final updatedDevices = widget.visualizerProvider.devices
-        .map((d) => d.copyWith(effect: effectId))
-        .toList();
-
-    for (var device in updatedDevices) {
-      widget.visualizerProvider.deviceActions(device, DeviceAction.update);
-    }
+    widget.visualizerProvider.setGlobalEffect(effectId);
   }
 
   @override
@@ -54,7 +47,7 @@ class _SimulatorPageState extends State<SimulatorPage> {
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.filter_vintage_outlined),
                   ),
-                  value: _selectedGlobalEffect.id,
+                  value: _selectedGlobalEffectId,
                   items: widget.visualizerProvider.effects
                       .map(
                         (e) =>
@@ -63,12 +56,7 @@ class _SimulatorPageState extends State<SimulatorPage> {
                       .toList(),
                   onChanged: (newEffectId) {
                     if (newEffectId != null) {
-                      setState(
-                        () => _selectedGlobalEffect = widget
-                            .visualizerProvider
-                            .effects
-                            .firstWhere((e) => e.id == newEffectId),
-                      );
+                      setState(() => _selectedGlobalEffectId = newEffectId);
                       _applyGlobalEffect(newEffectId);
                     }
                   },

@@ -176,6 +176,10 @@ class VisualizerProvider with ChangeNotifier {
     ),
   ];
 
+  String _globalEffectId = 'vertical-bars';
+
+  String get globalEffectId => _globalEffectId;
+
   UnmodifiableListView<LedEffect> get effects => UnmodifiableListView(_effects);
 
   LedEffect getEffectById(String id) {
@@ -202,6 +206,21 @@ class VisualizerProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final effectList = _effects.map((e) => json.encode(e.toJson())).toList();
     await prefs.setStringList('effects', effectList);
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> setGlobalEffect(String effectId) async {
+    _globalEffectId = effectId;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('globalEffect', json.encode(effectId));
+    final updatedDevices = _devices
+        .map((d) => d.copyWith(effect: effectId))
+        .toList();
+
+    for (var device in updatedDevices) {
+      deviceActions(device, DeviceAction.update);
+    }
     notifyListeners();
     return true;
   }
@@ -292,16 +311,25 @@ class VisualizerProvider with ChangeNotifier {
 
   // Enhanced simulator page data
   Future<void> simulatorPageDataEnhanced(
-    LedDevice device,
     AudioFeatures features,
+    LedEffect effect,
   ) async {
-    LedEffect effect = getEffectById(device.effect);
     late List<int> packetData;
+    LedDevice simulatedDevice = LedDevice(
+      id: 'Simulator',
+      name: 'Simulator',
+      ip: '127.0.0.1',
+      port: 60,
+      ledCount: 90,
+      effect: effect.id,
+      isEffectEnabled: true,
+      type: DeviceType.wled,
+    );
 
     // Use enhanced effects for new effect types
     if (effect.id == 'vertical-bars') {
       packetData = renderVerticalBars(
-        device: device,
+        device: simulatedDevice,
         features: features,
         gain: effect.parameters["gain"]?["value"] ?? 0.0,
         brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
@@ -309,7 +337,7 @@ class VisualizerProvider with ChangeNotifier {
       );
     } else if (effect.id == 'center-pulse') {
       packetData = renderCenterPulsePacket(
-        device: device,
+        device: simulatedDevice,
         features: features,
         gain: effect.parameters["gain"]?["value"] ?? 0.0,
         brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
@@ -317,7 +345,7 @@ class VisualizerProvider with ChangeNotifier {
       );
     } else if (effect.id == 'music-rhythm') {
       packetData = renderBeatDropEffect(
-        device: device,
+        device: simulatedDevice,
         features: features,
         gain: effect.parameters["gain"]?["value"] ?? 0.0,
         brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
@@ -328,8 +356,10 @@ class VisualizerProvider with ChangeNotifier {
       );
     }
 
-    packets = packetData;
-    notifyListeners();
+    if (packetData.isNotEmpty) {
+      packets = packetData;
+      notifyListeners();
+    }
   }
   // --- Device Management ---
 
@@ -357,6 +387,13 @@ class VisualizerProvider with ChangeNotifier {
         _effects[index] = effect;
       }
     }
+
+    // restore global effect
+    final globalEffectId = prefs.getString('globalEffect');
+    if (globalEffectId != null) {
+      _globalEffectId = globalEffectId;
+    }
+
     // initialize udp
     _udpSender.initiateUDPSender();
     notifyListeners();
@@ -604,7 +641,7 @@ class VisualizerProvider with ChangeNotifier {
 
         // Update simulator view if on tab 2
         if (_currentSelectedTab == 2) {
-          simulatorPageDataEnhanced(_devices[0], features);
+          simulatorPageDataEnhanced(features, getEffectById(_globalEffectId));
         }
       },
       onError: (error) {
@@ -643,17 +680,17 @@ class VisualizerProvider with ChangeNotifier {
 
         final Float32List fft = _recorder.getFft();
 
-        final audioFeatures = analyzer.analyze(fft);
+        final features = analyzer.analyze(fft);
 
         // Use enhanced audio processing
         sendUdpToDevices(
           targetDevices: _devices.where((d) => d.isEffectEnabled).toList(),
-          features: audioFeatures,
+          features: features,
         );
 
-        // if (_currentSelectedTab == 2) {
-        //   simulatorPageDataEnhanced(_devices[0], );
-        // }
+        if (_currentSelectedTab == 2) {
+           simulatorPageDataEnhanced(features, getEffectById(_globalEffectId));
+        }
       });
     } catch (e) {
       if (kDebugMode) {
