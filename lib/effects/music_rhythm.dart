@@ -20,10 +20,6 @@ final int _historyLength =
 
 // Variables for dynamic gain adjustment and rainbow effect.
 double _currentGain = 1.0; // Current amplification of the audio signal.
-final double _gainAttack =
-    0.005; // How quickly the gain reduces when loudness is high.
-final double _gainDecay =
-    0.001; // How quickly the gain increases when loudness is low.
 final double _targetLoudness = 0.1; // The desired average loudness level.
 double _rainbowHueOffset = 0.0; // Current position in the rainbow color cycle.
 final double _rainbowSpeed = 0.005; // How fast the rainbow colors cycle.
@@ -44,48 +40,43 @@ List<int> renderBeatDropEffect({
   final List<int> packet = [0x02, 0x04];
   final int now = DateTime.now().millisecondsSinceEpoch;
 
-  // Use bass energy from AudioFeatures
-  double rawBeatEnergy = features.bassEnergy;
+  double rawEnergy = features.bassEnergy;
 
-  // Choose gain
   final double userOrAutoGain = gain == 0
-      ? _beatDropAgc.computeGain(rawBeatEnergy)
+      ? _beatDropAgc.computeGain(rawEnergy)
       : gain;
 
-  double processedEnergy = rawBeatEnergy * userOrAutoGain;
+  double processedEnergy = rawEnergy * userOrAutoGain;
 
-  // Apply dynamic gain logic (preserved from original)
+  // Faster dynamic gain adjustment
   if (processedEnergy > _targetLoudness) {
-    _currentGain -= _gainAttack * (processedEnergy - _targetLoudness);
-  } else if (processedEnergy < _targetLoudness / 2) {
-    _currentGain += _gainDecay * (_targetLoudness - processedEnergy);
+    _currentGain -= 0.015 * (processedEnergy - _targetLoudness);
   } else {
-    _currentGain -= _gainDecay * 0.1;
+    _currentGain += 0.004 * (_targetLoudness - processedEnergy);
   }
-  _currentGain = _currentGain.clamp(0.5, 5.0);
+  _currentGain = _currentGain.clamp(1.0, 6.0);
 
-  double currentEnergy = rawBeatEnergy * _currentGain;
+  double currentEnergy = rawEnergy * _currentGain;
 
   // Squelch
-  if (currentEnergy < 0.1) currentEnergy = 0.0;
+  if (currentEnergy < 0.05) currentEnergy = 0.0;
 
-  // History tracking
   _energyHistory.add(currentEnergy);
   if (_energyHistory.length > _historyLength) {
     _energyHistory.removeAt(0);
   }
 
-  double avgHistoryEnergy = _energyHistory.isEmpty
+  double avgEnergy = _energyHistory.isEmpty
       ? 0.0
       : _energyHistory.reduce((a, b) => a + b) / _energyHistory.length;
 
-  final double dynamicThreshold = avgHistoryEnergy * 1.1 + 0.005;
+  // Make beat threshold a bit more aggressive
+  final double dynamicThreshold = avgEnergy * 1.05 + 0.002;
+  final bool beatDetected = currentEnergy > dynamicThreshold;
 
-  final bool beatDetectedThisFrame = currentEnergy > dynamicThreshold;
-
-  // Beat trigger
-  if (beatDetectedThisFrame && (now - _lastBeatDetectedTime > 150)) {
-    _currentRisingLedsCount += raiseSpeed;
+  if (beatDetected && (now - _lastBeatDetectedTime > 120)) {
+    // Increase rising LEDs more forcefully
+    _currentRisingLedsCount += raiseSpeed + 2;
     _currentDropLogicalPos = 0.0;
     _lastBeatDetectedTime = now;
   } else {
@@ -97,7 +88,6 @@ List<int> renderBeatDropEffect({
     count.toDouble(),
   );
 
-  // Dropping logic
   if (_currentDropLogicalPos < count) {
     _currentDropLogicalPos += dropSpeed;
   } else {
@@ -110,11 +100,10 @@ List<int> renderBeatDropEffect({
     }
   }
 
-  // Rainbow hue cycle (same logic)
   _rainbowHueOffset = (_rainbowHueOffset + _rainbowSpeed) % 1.0;
 
   final int risingBottomLeds = _currentRisingLedsCount.round();
-  int dropLedPosition = _currentDropLogicalPos.floor();
+  final int dropLedPosition = _currentDropLogicalPos.floor();
 
   for (int i = 0; i < count; i++) {
     List<int> ledColor = [0, 0, 0];

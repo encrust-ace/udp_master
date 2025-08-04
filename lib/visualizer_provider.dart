@@ -155,9 +155,9 @@ class VisualizerProvider with ChangeNotifier {
         'raiseSpeed': {
           'min': 5.0,
           'max': 30.0,
-          'value': 12.5,
+          'value': 10,
           'steps': 10,
-          'default': 12.5,
+          'default': 10,
         },
         'decaySpeed': {
           'min': 0.3,
