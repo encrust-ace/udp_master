@@ -82,158 +82,47 @@ class _ScreenSelectDialogState extends State<ScreenSelectDialog>
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final isLargeScreen = screenSize.width > 600;
-    final dialogWidth = isLargeScreen ? 700.0 : screenSize.width * 0.9;
-    final dialogHeight = isLargeScreen ? 600.0 : screenSize.height * 0.8;
+    final isLargeScreen = MediaQuery.of(context).size.width > 600;
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: dialogWidth,
-        height: dialogHeight,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
+    return AlertDialog(
+      title: const Text('Share Your Screen'),
+      contentPadding: const EdgeInsets.fromLTRB(12, 20, 12, 0),
+      actionsPadding: const EdgeInsets.all(8),
+      content: SizedBox(
+        width: isLargeScreen ? 700.0 : MediaQuery.of(context).size.width * 0.9,
+        height: isLargeScreen ? 600.0 : MediaQuery.of(context).size.height * 0.8,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Header with close button
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Share Your Screen',
-                    style: TextStyle(
-                      fontSize: isLargeScreen ? 20 : 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(
-                      Icons.close_rounded,
-                      color: Colors.grey.shade600,
-                      size: 24,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
+            TabBar(
+              controller: _tabController,
+              onTap: _onTabChanged,
+              tabs: const [
+                Tab(text: 'Entire Screen'),
+                Tab(text: 'Application Window'),
+              ],
             ),
-
-            // Tabs
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: TabBar(
-                controller: _tabController,
-                onTap: _onTabChanged,
-                indicator: BoxDecoration(
-                  color: Colors.blue.shade600,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                dividerColor: Colors.transparent,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.grey.shade600,
-                labelStyle: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-                tabs: const [
-                  Tab(text: 'Entire Screen'),
-                  Tab(text: 'Application Window'),
-                ],
-              ),
-            ),
-
-            // Content grid
+            const SizedBox(height: 16),
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _buildSourceGrid(isLargeScreen),
-              ),
-            ),
-
-            // Action buttons
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(16),
-                  bottomRight: Radius.circular(16),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                    ),
-                    child: Text(
-                      'Cancel',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: _selectedSource != null
-                        ? () => Navigator.pop(context, _selectedSource)
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade600,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      'Share',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
+              child: _buildSourceGrid(isLargeScreen),
             ),
           ],
         ),
       ),
+      actions: <Widget>[
+        TextButton(
+          child: const Text('Cancel'),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
+        ElevatedButton(
+          onPressed: _selectedSource != null
+              ? () => Navigator.of(context).pop(_selectedSource)
+              : null,
+          child: const Text('Share'),
+        ),
+      ],
     );
   }
 
@@ -248,18 +137,11 @@ class _ScreenSelectDialogState extends State<ScreenSelectDialog>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.monitor_outlined,
-              size: 48,
-              color: Colors.grey.shade400,
-            ),
+            const Icon(Icons.monitor_outlined, size: 48, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
               'No sources available',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
             ),
           ],
         ),
@@ -290,6 +172,7 @@ class _ScreenSelectDialogState extends State<ScreenSelectDialog>
   }
 }
 
+// The ThumbnailWidget and ScreenCapturePage classes remain unchanged.
 class ThumbnailWidget extends StatefulWidget {
   final DesktopCapturerSource source;
   final bool selected;
