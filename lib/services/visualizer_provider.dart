@@ -355,8 +355,9 @@ class VisualizerProvider with ChangeNotifier {
   Future<bool> _startVisualizer() async {
     if (_isRunning) return true;
     if (!await _ensureMicPermission()) {
-      if (kDebugMode)
+      if (kDebugMode) {
         print("VisualizerService: Microphone permission not granted.");
+      }
       return false;
     }
 
