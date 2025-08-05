@@ -40,12 +40,6 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   VisualizerProvider._internal();
-  CastMode _castMode = CastMode.audio;
-  CastMode get castMode => _castMode;
-  set castMode(CastMode value) {
-    _castMode = value;
-    notifyListeners();
-  }
 
   final Recorder _recorder = Recorder.instance;
   // For Linux
@@ -585,12 +579,6 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   Future<void> _stopVisualizer() async {
-    if (!_isRunning &&
-        _micSubscription == null &&
-        _udpSender.udpSocket == null) {
-      return;
-    }
-
     if (Platform.isLinux) {
       _recorder.stopStreamingData();
       _recorder.deinit();
@@ -599,7 +587,7 @@ class VisualizerProvider with ChangeNotifier {
       _micSubscription = null;
       await _platform.invokeMethod("stopMic");
     }
-
+    _udpSender.close();
     _isRunning = false;
     notifyListeners();
   }
@@ -738,7 +726,6 @@ class VisualizerProvider with ChangeNotifier {
     _screenStream = stream;
     _videoKey = key;
     _isRunning = true;
-    _castMode = CastMode.video;
 
     _screenTimer?.cancel();
 

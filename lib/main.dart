@@ -50,7 +50,7 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
     if (!_isInitialDependenciesMet) {
       _visualizerProvider = Provider.of<VisualizerProvider>(
         context,
-        listen: false,
+        listen: true,
       );
       _visualizerProvider.initiateTheAppData();
       _isInitialDependenciesMet = true;
@@ -64,12 +64,25 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
         title: const Icon(Icons.lightbulb, size: 36),
         actions: [
           IconButton(
-            onPressed: () => {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ScreenCapturePage()),
-              ),
-            },
+            onPressed: () async => await _visualizerProvider.toggleVisualizer(),
+            icon: Icon(
+              _visualizerProvider.isRunning
+                  ? Icons.pause_circle
+                  : Icons.play_arrow_rounded,
+              size: 28,
+            ),
+          ),
+          IconButton(
+            onPressed: _visualizerProvider.isRunning
+                ? null
+                : () => {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ScreenCapturePage(),
+                      ),
+                    ),
+                  },
             icon: const Icon(Icons.video_call),
           ),
           // Import/Export buttons
@@ -142,32 +155,6 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
           ],
         ),
       ),
-
-      // Floating action button
-      floatingActionButton: Consumer<VisualizerProvider>(
-        builder: (context, provider, _) => FloatingActionButton(
-          onPressed: () async => await provider.toggleVisualizer(),
-          backgroundColor: provider.isRunning
-              ? Colors.redAccent
-              : Theme.of(context).colorScheme.secondary,
-          foregroundColor: Colors.white,
-          elevation: 2.0,
-          shape: const CircleBorder(),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            transitionBuilder: (child, animation) =>
-                ScaleTransition(scale: animation, child: child),
-            child: Icon(
-              provider.isRunning
-                  ? Icons.stop_rounded
-                  : Icons.play_arrow_rounded,
-              key: ValueKey<bool>(provider.isRunning),
-              size: 36,
-            ),
-          ),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.miniEndFloat,
     );
   }
 }

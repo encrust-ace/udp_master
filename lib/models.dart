@@ -1,5 +1,3 @@
-enum CastMode { audio, video }
-
 enum DeviceAction { add, update, delete }
 
 enum DeviceType {

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_background/flutter_background.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:provider/provider.dart';
 import 'package:udp_master/services/visualizer_provider.dart';
@@ -82,15 +83,13 @@ class _ScreenSelectDialogState extends State<ScreenSelectDialog>
 
   @override
   Widget build(BuildContext context) {
-    final isLargeScreen = MediaQuery.of(context).size.width > 600;
-
     return AlertDialog(
       title: const Text('Share Your Screen'),
-      contentPadding: const EdgeInsets.fromLTRB(12, 20, 12, 0),
+      contentPadding: const EdgeInsets.all(24.0),
       actionsPadding: const EdgeInsets.all(8),
       content: SizedBox(
-        width: isLargeScreen ? 700.0 : MediaQuery.of(context).size.width * 0.9,
-        height: isLargeScreen ? 600.0 : MediaQuery.of(context).size.height * 0.8,
+        width: 700.0,
+        height: 600.0,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -103,9 +102,7 @@ class _ScreenSelectDialogState extends State<ScreenSelectDialog>
               ],
             ),
             const SizedBox(height: 16),
-            Expanded(
-              child: _buildSourceGrid(isLargeScreen),
-            ),
+            Expanded(child: _buildSourceGrid()),
           ],
         ),
       ),
@@ -126,38 +123,33 @@ class _ScreenSelectDialogState extends State<ScreenSelectDialog>
     );
   }
 
-  Widget _buildSourceGrid(bool isLargeScreen) {
+  Widget _buildSourceGrid() {
     final filteredSources = _sources.entries
         .where((entry) => entry.value.type == _sourceType)
         .map((entry) => entry.value)
         .toList();
 
     if (filteredSources.isEmpty) {
-      return Center(
+      return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.monitor_outlined, size: 48, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text(
-              'No sources available',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
-            ),
+            Icon(Icons.monitor_outlined, size: 48),
+            SizedBox(height: 16),
+            Text('No sources available'),
           ],
         ),
       );
     }
 
-    final crossAxisCount = isLargeScreen
-        ? (_sourceType == SourceType.Screen ? 2 : 3)
-        : (_sourceType == SourceType.Screen ? 1 : 2);
+    final crossAxisCount = _sourceType == SourceType.Screen ? 2 : 3;
 
     return GridView.builder(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: isLargeScreen ? 1.4 : 1.2,
+        childAspectRatio: 1.4,
       ),
       itemCount: filteredSources.length,
       itemBuilder: (context, index) {
@@ -172,7 +164,6 @@ class _ScreenSelectDialogState extends State<ScreenSelectDialog>
   }
 }
 
-// The ThumbnailWidget and ScreenCapturePage classes remain unchanged.
 class ThumbnailWidget extends StatefulWidget {
   final DesktopCapturerSource source;
   final bool selected;
@@ -218,23 +209,15 @@ class _ThumbnailWidgetState extends State<ThumbnailWidget> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => widget.onTap(widget.source),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+      child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: widget.selected ? Colors.blue.shade600 : Colors.grey.shade300,
+            color: widget.selected
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).dividerColor,
             width: widget.selected ? 2 : 1,
           ),
-          boxShadow: widget.selected
-              ? [
-                  BoxShadow(
-                    color: Colors.blue.shade200,
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
         ),
         child: Column(
           children: [
@@ -243,7 +226,7 @@ class _ThumbnailWidgetState extends State<ThumbnailWidget> {
                 margin: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
-                  color: Colors.grey.shade100,
+                  color: Theme.of(context).hoverColor,
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
@@ -260,21 +243,16 @@ class _ThumbnailWidgetState extends State<ThumbnailWidget> {
                                 ? Icons.monitor_outlined
                                 : Icons.window_outlined,
                             size: 32,
-                            color: Colors.grey.shade400,
+                            color: Theme.of(context).disabledColor,
                           ),
                         ),
                 ),
               ),
             ),
-            Container(
+            Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Text(
                 widget.source.name,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
-                  color: widget.selected ? Colors.blue.shade700 : Colors.grey.shade700,
-                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
@@ -299,6 +277,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
   final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
   bool _isScreenCapturing = false;
   final GlobalKey videoKey = GlobalKey();
+  DesktopCapturerSource? selectedSource;
 
   @override
   void initState() {
@@ -313,15 +292,26 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
     super.dispose();
   }
 
-  Future<void> _startScreenCapture(DesktopCapturerSource source) async {
+  Future<void> _startScreenCapture(DesktopCapturerSource? source) async {
+    setState(() {
+      selectedSource = source;
+    });
     try {
-      final stream = await navigator.mediaDevices.getDisplayMedia({
-        'video': {
-          'deviceId': {'exact': source.id},
-          'mandatory': {'frameRate': 30.0},
+      var stream = await navigator.mediaDevices.getDisplayMedia(
+        <String, dynamic>{
+          'video': selectedSource == null
+              ? true
+              : {
+                  'deviceId': {'exact': selectedSource!.id},
+                  'mandatory': {'frameRate': 30.0},
+                },
         },
-      });
-
+      );
+      stream.getVideoTracks()[0].onEnded = () {
+        print(
+          'By adding a listener on onEnded you can: 1) catch stop video sharing on Web',
+        );
+      };
       _localStream = stream;
       _localRenderer.srcObject = stream;
 
@@ -344,7 +334,10 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
       _localRenderer.srcObject = null;
 
       if (mounted) {
-        final provider = Provider.of<VisualizerProvider>(context, listen: false);
+        final provider = Provider.of<VisualizerProvider>(
+          context,
+          listen: false,
+        );
         await provider.stopScreenSync();
       }
     } catch (e) {
@@ -352,7 +345,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
     }
   }
 
-  void _toggleScreenCapture() {
+  Future<void> _toggleScreenCapture() async {
     if (_isScreenCapturing) {
       _stop();
       setState(() => _isScreenCapturing = false);
@@ -364,18 +357,52 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
       ).then((source) {
         if (source != null) _startScreenCapture(source);
       });
+    } else {
+      if (WebRTC.platformIsAndroid) {
+        // Android specific
+        Future<void> requestBackgroundPermission([bool isRetry = false]) async {
+          // Required for android screenshare.
+          try {
+            var hasPermissions = await FlutterBackground.hasPermissions;
+            if (!isRetry) {
+              const androidConfig = FlutterBackgroundAndroidConfig(
+                notificationTitle: 'Screen Sharing',
+                notificationText: 'LiveKit Example is sharing the screen.',
+                notificationImportance: AndroidNotificationImportance.normal,
+                notificationIcon: AndroidResource(
+                  name: 'livekit_ic_launcher',
+                  defType: 'mipmap',
+                ),
+              );
+              hasPermissions = await FlutterBackground.initialize(
+                androidConfig: androidConfig,
+              );
+            }
+            if (hasPermissions &&
+                !FlutterBackground.isBackgroundExecutionEnabled) {
+              await FlutterBackground.enableBackgroundExecution();
+            }
+          } catch (e) {
+            if (!isRetry) {
+              return await Future<void>.delayed(
+                const Duration(seconds: 1),
+                () => requestBackgroundPermission(true),
+              );
+            }
+            print('could not publish video: $e');
+          }
+        }
+
+        await requestBackgroundPermission();
+      }
+      await _startScreenCapture(null);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Screen Capture"),
-        backgroundColor: Colors.grey.shade50,
-        foregroundColor: Colors.grey.shade800,
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text("Screen Capture"), elevation: 0),
       body: _isScreenCapturing
           ? RepaintBoundary(
               key: videoKey,
@@ -385,45 +412,23 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
                 child: RTCVideoView(_localRenderer),
               ),
             )
-          : Center(
+          : const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.screen_share_outlined,
-                    size: 64,
-                    color: Colors.grey.shade400,
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Ready to share your screen',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Tap the button below to get started',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
+                  Icon(Icons.screen_share_outlined, size: 64),
+                  SizedBox(height: 24),
+                  Text('Ready to share your screen'),
+                  SizedBox(height: 8),
+                  Text('Tap the button below to get started'),
                 ],
               ),
             ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: _toggleScreenCapture,
-        backgroundColor: _isScreenCapturing ? Colors.red.shade600 : Colors.blue.shade600,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        label: Text(
-          _isScreenCapturing ? 'Stop Sharing' : 'Start Sharing',
-          style: const TextStyle(fontWeight: FontWeight.w600),
+        child: Icon(
+          _isScreenCapturing ? Icons.stop_rounded : Icons.play_arrow_rounded,
         ),
-        icon: Icon(_isScreenCapturing ? Icons.stop_rounded : Icons.play_arrow_rounded),
       ),
     );
   }
