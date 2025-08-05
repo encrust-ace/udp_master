@@ -587,7 +587,6 @@ class VisualizerProvider with ChangeNotifier {
       _micSubscription = null;
       await _platform.invokeMethod("stopMic");
     }
-    _udpSender.close();
     _isRunning = false;
     notifyListeners();
   }
@@ -746,7 +745,6 @@ class VisualizerProvider with ChangeNotifier {
     _isRunning = false;
     _screenStream?.dispose();
     _screenStream = null;
-    _udpSender.close();
     notifyListeners();
   }
 

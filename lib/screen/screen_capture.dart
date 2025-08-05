@@ -83,44 +83,44 @@ class _ScreenSelectDialogState extends State<ScreenSelectDialog>
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Share Your Screen'),
-      contentPadding: const EdgeInsets.all(24.0),
-      actionsPadding: const EdgeInsets.all(8),
-      content: SizedBox(
+      return AlertDialog(
+        title: const Text('Share Your Screen'),
+        contentPadding: const EdgeInsets.all(24.0),
+        actionsPadding: const EdgeInsets.all(8),
+        content: SizedBox(
         width: 700.0,
         height: 600.0,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TabBar(
-              controller: _tabController,
-              onTap: _onTabChanged,
-              tabs: const [
-                Tab(text: 'Entire Screen'),
-                Tab(text: 'Application Window'),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Expanded(child: _buildSourceGrid()),
-          ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TabBar(
+                controller: _tabController,
+                onTap: _onTabChanged,
+                tabs: const [
+                  Tab(text: 'Entire Screen'),
+                  Tab(text: 'Application Window'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Expanded(child: _buildSourceGrid()),
+            ],
+          ),
         ),
-      ),
-      actions: <Widget>[
-        TextButton(
-          child: const Text('Cancel'),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-        ),
-        ElevatedButton(
-          onPressed: _selectedSource != null
-              ? () => Navigator.of(context).pop(_selectedSource)
-              : null,
-          child: const Text('Share'),
-        ),
-      ],
-    );
+        actions: <Widget>[
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+          ElevatedButton(
+            onPressed: _selectedSource != null
+                ? () => Navigator.of(context).pop(_selectedSource)
+                : null,
+            child: const Text('Share'),
+          ),
+        ],
+      );
   }
 
   Widget _buildSourceGrid() {
@@ -187,6 +187,10 @@ class _ThumbnailWidgetState extends State<ThumbnailWidget> {
   @override
   void initState() {
     super.initState();
+    _subscribeToSource();
+  }
+
+  void _subscribeToSource() {
     _subscriptions.addAll([
       widget.source.onThumbnailChanged.stream.listen((thumbnail) {
         if (mounted) setState(() => _thumbnail = thumbnail);
@@ -195,6 +199,18 @@ class _ThumbnailWidgetState extends State<ThumbnailWidget> {
         if (mounted) setState(() {});
       }),
     ]);
+  }
+
+  @override
+  void didUpdateWidget(covariant ThumbnailWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.source.id != widget.source.id) {
+      for (var sub in _subscriptions) {
+        sub.cancel();
+      }
+      _subscriptions.clear();
+      _subscribeToSource();
+    }
   }
 
   @override
@@ -277,7 +293,6 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
   final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
   bool _isScreenCapturing = false;
   final GlobalKey videoKey = GlobalKey();
-  DesktopCapturerSource? selectedSource;
 
   @override
   void initState() {
@@ -293,25 +308,22 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
   }
 
   Future<void> _startScreenCapture(DesktopCapturerSource? source) async {
-    setState(() {
-      selectedSource = source;
-    });
     try {
       var stream = await navigator.mediaDevices.getDisplayMedia(
         <String, dynamic>{
-          'video': selectedSource == null
+          'video': source == null
               ? true
               : {
-                  'deviceId': {'exact': selectedSource!.id},
+                  'deviceId': {'exact': source.id},
                   'mandatory': {'frameRate': 30.0},
                 },
         },
       );
+
       stream.getVideoTracks()[0].onEnded = () {
-        print(
-          'By adding a listener on onEnded you can: 1) catch stop video sharing on Web',
-        );
+        debugPrint('Screen sharing ended.');
       };
+
       _localStream = stream;
       _localRenderer.srcObject = stream;
 
@@ -334,10 +346,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
       _localRenderer.srcObject = null;
 
       if (mounted) {
-        final provider = Provider.of<VisualizerProvider>(
-          context,
-          listen: false,
-        );
+        final provider = Provider.of<VisualizerProvider>(context, listen: false);
         await provider.stopScreenSync();
       }
     } catch (e) {
@@ -347,8 +356,8 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
 
   Future<void> _toggleScreenCapture() async {
     if (_isScreenCapturing) {
-      _stop();
-      setState(() => _isScreenCapturing = false);
+      await _stop();
+      if (mounted) setState(() => _isScreenCapturing = false);
     } else if (WebRTC.platformIsDesktop) {
       showDialog<DesktopCapturerSource>(
         context: context,
@@ -359,9 +368,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
       });
     } else {
       if (WebRTC.platformIsAndroid) {
-        // Android specific
         Future<void> requestBackgroundPermission([bool isRetry = false]) async {
-          // Required for android screenshare.
           try {
             var hasPermissions = await FlutterBackground.hasPermissions;
             if (!isRetry) {
@@ -374,27 +381,23 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
                   defType: 'mipmap',
                 ),
               );
-              hasPermissions = await FlutterBackground.initialize(
-                androidConfig: androidConfig,
-              );
+              hasPermissions = await FlutterBackground.initialize(androidConfig: androidConfig);
             }
-            if (hasPermissions &&
-                !FlutterBackground.isBackgroundExecutionEnabled) {
+            if (hasPermissions && !FlutterBackground.isBackgroundExecutionEnabled) {
               await FlutterBackground.enableBackgroundExecution();
             }
           } catch (e) {
             if (!isRetry) {
-              return await Future<void>.delayed(
-                const Duration(seconds: 1),
-                () => requestBackgroundPermission(true),
-              );
+              await Future<void>.delayed(const Duration(seconds: 1));
+              await requestBackgroundPermission(true);
             }
-            print('could not publish video: $e');
+            debugPrint('Could not enable background mode: $e');
           }
         }
 
         await requestBackgroundPermission();
       }
+
       await _startScreenCapture(null);
     }
   }
