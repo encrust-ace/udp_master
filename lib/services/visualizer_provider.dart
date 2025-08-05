@@ -825,6 +825,19 @@ class VisualizerProvider with ChangeNotifier {
       20; // Pixels with R,G,B values below this are treated as black
   final double gamma = 2.2; // A common gamma value for sRGB color space
 
+  int getColorValue(Color color, String channel) {
+    switch (channel) {
+      case 'r':
+        return ((color.r * 255.0).round() & 0xff);
+      case 'g':
+        return ((color.g * 255.0).round() & 0xff);
+      case 'b':
+        return ((color.b * 255.0).round() & 0xff);
+      default:
+        return ((color.r * 255.0).round() & 0xff);
+    }
+  }
+
   List<int> _renderScreenData({
     required LedDevice device,
     required Uint8List pixelData,
@@ -856,9 +869,9 @@ class VisualizerProvider with ChangeNotifier {
 
     // A helper function for saturation boost
     Color applySaturationBoost(Color color) {
-      double r = double.parse(((color.r * 255.0).round() & 0xff).toString());
-      double g = double.parse(((color.g * 255.0).round() & 0xff).toString());
-      double b = double.parse(((color.b * 255.0).round() & 0xff).toString());
+      double r = double.parse(getColorValue(color, 'r').toString());
+      double g = double.parse(getColorValue(color, 'g').toString());
+      double b = double.parse(getColorValue(color, 'b').toString());
       double l = 0.3 * r + 0.59 * g + 0.11 * b; // Calculate luminance
 
       // Blend the color towards its luminance (gray) to increase saturation
@@ -922,9 +935,9 @@ class VisualizerProvider with ChangeNotifier {
         Color newColor = Color.fromARGB(255, newR, newG, newB);
 
         // Apply gamma correction to the sampled color
-        final int gammaR = applyGamma(newColor.red);
-        final int gammaG = applyGamma(newColor.green);
-        final int gammaB = applyGamma(newColor.blue);
+        final int gammaR = applyGamma(getColorValue(newColor, 'r'));
+        final int gammaG = applyGamma(getColorValue(newColor, 'g'));
+        final int gammaB = applyGamma(getColorValue(newColor, 'b'));
         newColor = Color.fromARGB(255, gammaR, gammaG, gammaB);
 
         // Apply a simple saturation boost to the gamma-corrected color
@@ -933,16 +946,16 @@ class VisualizerProvider with ChangeNotifier {
         final Color previousColor = _previousColors[device.id]![i];
 
         final int r =
-            ((previousColor.red * (1 - smoothingFactor)) +
-                    (boostedColor.red * smoothingFactor))
+            ((getColorValue(previousColor, 'r') * (1 - smoothingFactor)) +
+                    (getColorValue(boostedColor, 'r') * smoothingFactor))
                 .round();
         final int g =
-            ((previousColor.green * (1 - smoothingFactor)) +
-                    (boostedColor.green * smoothingFactor))
+            ((getColorValue(previousColor, 'g') * (1 - smoothingFactor)) +
+                    (getColorValue(boostedColor, 'g') * smoothingFactor))
                 .round();
         final int b =
-            ((previousColor.blue * (1 - smoothingFactor)) +
-                    (boostedColor.blue * smoothingFactor))
+            ((getColorValue(previousColor, 'b') * (1 - smoothingFactor)) +
+                    (getColorValue(boostedColor, 'b') * smoothingFactor))
                 .round();
 
         packet.addAll([r, g, b]);
