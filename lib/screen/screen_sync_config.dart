@@ -16,8 +16,12 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
   late DisplayPosition _selectedSide;
   LedDevice? _selectedDevice;
 
-  final TextEditingController _startIndexController = TextEditingController(text: '1');
-  final TextEditingController _endIndexController = TextEditingController(text: '1');
+  final TextEditingController _startIndexController = TextEditingController(
+    text: '1',
+  );
+  final TextEditingController _endIndexController = TextEditingController(
+    text: '1',
+  );
 
   List<DisplayPosition> _availableSides = [];
   bool _isEditing = false;
@@ -46,7 +50,8 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
         _selectedDevice == null &&
         provider.devices.isNotEmpty) {
       final defaultDevice = provider.devices.firstWhere(
-        (device) => device.type == DeviceType.wled || device.type == DeviceType.esphome,
+        (device) =>
+            device.type == DeviceType.wled || device.type == DeviceType.esphome,
         orElse: () => provider.devices.first,
       );
 
@@ -81,9 +86,9 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
   void _saveDisplaySide() {
     if (_selectedDevice == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a device')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a device')));
       return;
     }
 
@@ -150,10 +155,14 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: Column(
+                        spacing: 8,
                         children: [
                           _buildRow(Icons.rounded_corner, edge.position.name),
                           _buildRow(Icons.light, edge.device?.name ?? ''),
-                          _buildRow(Icons.join_left, edge.startIndex.toString()),
+                          _buildRow(
+                            Icons.join_left,
+                            edge.startIndex.toString(),
+                          ),
                           _buildRow(Icons.join_right, edge.endIndex.toString()),
                         ],
                       ),
@@ -197,7 +206,9 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
   }
 
   Row _buildRow(IconData icon, String text) {
-    return Row(children: [Icon(icon), const SizedBox(width: 4), Text(text)]);
+    return Row(
+      spacing: 4,
+      children: [Icon(icon), const SizedBox(width: 4), Text(text)]);
   }
 
   Dialog _buildAddEditDialog(BuildContext context) {
@@ -209,18 +220,29 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
         child: Form(
           key: _formKey,
           child: Column(
+            spacing: 24,
             children: [
               DropdownButtonFormField<DisplayPosition>(
                 isExpanded: true,
                 hint: const Text("Select Side"),
-                value: _availableSides.contains(_selectedSide) ? _selectedSide : null,
+                value: _availableSides.contains(_selectedSide)
+                    ? _selectedSide
+                    : null,
                 decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 9,
+                    horizontal: 8,
+                  ),
                 ),
                 items: _availableSides
-                    .map((side) => DropdownMenuItem(value: side, child: Text(side.name)))
+                    .map(
+                      (side) =>
+                          DropdownMenuItem(value: side, child: Text(side.name)),
+                    )
                     .toList(),
                 onChanged: (val) {
                   if (val != null) {
@@ -228,21 +250,27 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
                   }
                 },
               ),
-              const SizedBox(height: 12),
               DropdownButtonFormField<LedDevice>(
                 isExpanded: true,
                 hint: const Text("Select Device"),
                 value: _selectedDevice,
                 decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 9,
+                    horizontal: 8,
+                  ),
                 ),
                 items: provider.devices
-                    .map((device) => DropdownMenuItem(
-                          value: device,
-                          child: Text(device.name),
-                        ))
+                    .map(
+                      (device) => DropdownMenuItem(
+                        value: device,
+                        child: Text(device.name),
+                      ),
+                    )
                     .toList(),
                 onChanged: (val) {
                   if (val != null) {
@@ -250,8 +278,8 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
                   }
                 },
               ),
-              const SizedBox(height: 12),
               Row(
+                spacing: 12,
                 children: [
                   Expanded(
                     child: TextFormField(
@@ -265,7 +293,8 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         final n = int.tryParse(value ?? '');
-                        final end = int.tryParse(_endIndexController.text) ??
+                        final end =
+                            int.tryParse(_endIndexController.text) ??
                             _selectedDevice?.ledCount ??
                             1;
                         if (n == null || n <= 0 || n > end) {
@@ -275,7 +304,6 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
                       },
                     ),
                   ),
-                  const SizedBox(width: 8),
                   Expanded(
                     child: TextFormField(
                       controller: _endIndexController,
@@ -288,7 +316,8 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         final n = int.tryParse(value ?? '');
-                        final start = int.tryParse(_startIndexController.text) ?? 1;
+                        final start =
+                            int.tryParse(_startIndexController.text) ?? 1;
                         final max = _selectedDevice?.ledCount ?? 1;
                         if (n == null || n < start || n > max) {
                           return 'Invalid end index';
@@ -299,16 +328,15 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
               Row(
+                spacing: 12,
                 children: [
                   Expanded(
-                    child: TextButton(
+                    child: ElevatedButton(
                       onPressed: () => Navigator.pop(context),
                       child: const Text("Cancel"),
                     ),
                   ),
-                  const SizedBox(width: 8),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: _saveDisplaySide,

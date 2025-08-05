@@ -52,11 +52,11 @@ class _HomeState extends State<Home> {
       padding: const EdgeInsets.all(8.0),
       child: SingleChildScrollView(
         child: Column(
+          spacing: 12,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 8),
             _buildHeaderControls(provider),
-            const SizedBox(height: 12),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -72,6 +72,7 @@ class _HomeState extends State<Home> {
 
   Widget _buildHeaderControls(VisualizerProvider provider) {
     return Row(
+      spacing: 12,
       children: [
         Expanded(
           flex: 2,
@@ -95,7 +96,6 @@ class _HomeState extends State<Home> {
             },
           ),
         ),
-        const SizedBox(width: 16),
         Expanded(
           flex: 3,
           child: DropdownButtonFormField<String>(
@@ -183,6 +183,7 @@ class _HomeState extends State<Home> {
     return Padding(
       padding: const EdgeInsets.only(top: 8.0, bottom: 8, left: 16, right: 16),
       child: Column(
+        spacing: 8,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -249,6 +250,7 @@ class _HomeState extends State<Home> {
   ) {
     final effects = provider.effects;
     return Row(
+      spacing: 12,
       children: [
         Expanded(
           child: DropdownButtonFormField<String>(
