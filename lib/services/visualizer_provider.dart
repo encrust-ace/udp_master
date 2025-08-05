@@ -2,6 +2,7 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
+import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -67,7 +68,7 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   StreamSubscription? _micSubscription;
-
+  List<DisplaySide> _displaySides = [];
   List<LedDevice> _devices = [];
   UnmodifiableListView<LedDevice> get devices => UnmodifiableListView(_devices);
 
@@ -397,6 +398,12 @@ class VisualizerProvider with ChangeNotifier {
       _globalEffectId = globalEffectId;
     }
 
+    // restore display sides
+    final displaySideList = prefs.getStringList('displaySides') ?? [];
+    _displaySides = displaySideList
+        .map((e) => DisplaySide.fromJson(json.decode(e)))
+        .toList();
+
     // initialize udp
     _udpSender.initiateUDPSender();
     notifyListeners();
@@ -702,12 +709,31 @@ class VisualizerProvider with ChangeNotifier {
     }
   }
 
-  ///////
-  ///
+  // --- Screen Sync Methods ---
   GlobalKey? _videoKey;
   MediaStream? _screenStream;
   Timer? _screenTimer;
-  // Update the startScreenSync method to accept the GlobalKey
+
+  UnmodifiableListView<DisplaySide> get displaySides =>
+      UnmodifiableListView(_displaySides);
+
+  Future<bool> addOrUpdateDisplaySide(DisplaySide side) async {
+    // Check if the side already exists
+    int index = _displaySides.indexWhere((s) => s.position == side.position);
+    if (index != -1) {
+      // Update existing side
+      _displaySides[index] = side;
+    } else {
+      // Add new side
+      _displaySides.add(side);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final sideList = _displaySides.map((s) => json.encode(s.toJson())).toList();
+    await prefs.setStringList('displaySides', sideList);
+    notifyListeners();
+    return true;
+  }
+
   Future<void> startScreenSync(MediaStream stream, GlobalKey key) async {
     _screenStream = stream;
     _videoKey = key;
@@ -738,10 +764,10 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   Future<void> _processFrameAndSend() async {
-    // Check if the key and devices are valid
+    // Check if the key and displaySides are valid
     if (_videoKey == null ||
         _videoKey!.currentContext == null ||
-        _devices.isEmpty) {
+        _displaySides.isEmpty) {
       return;
     }
 
@@ -755,45 +781,28 @@ class VisualizerProvider with ChangeNotifier {
         format: ui.ImageByteFormat.rawRgba,
       );
 
-      if (byteData == null) {
-        return;
-      }
+      if (byteData == null) return;
 
       Uint8List pixelData = byteData.buffer.asUint8List();
       final int width = image.width;
       final int height = image.height;
 
-      // Filter devices for left and right
-      final leftDevices = _devices.where(
-        (d) => d.name.toLowerCase().contains('2'),
-      );
-      final rightDevices = _devices.where(
-        (d) => d.name.toLowerCase().contains('1'),
-      );
+      // Iterate through all configured display sides
+      for (final side in _displaySides) {
+        final device = side.device;
 
-      // Process and send for all left-side devices
-      for (var device in leftDevices) {
+        if (device == null) continue;
+
         final packetData = _renderScreenData(
           device: device,
           pixelData: pixelData,
           width: width,
           height: height,
-          side: 'left',
+          side: side.position,
+          startIndex: side.startIndex,
+          endIndex: side.endIndex,
         );
-        if (packetData.isNotEmpty) {
-          _udpSender.send(device, packetData);
-        }
-      }
 
-      // Process and send for all right-side devices
-      for (var device in rightDevices) {
-        final packetData = _renderScreenData(
-          device: device,
-          pixelData: pixelData,
-          width: width,
-          height: height,
-          side: 'right',
-        );
         if (packetData.isNotEmpty) {
           _udpSender.send(device, packetData);
         }
@@ -807,80 +816,140 @@ class VisualizerProvider with ChangeNotifier {
     }
   }
 
-  // visualizer_provider.dart (add this to your member variables)
+  // Add this to your member variables at the top of the class
   final Map<String, List<Color>> _previousColors = {};
-  // Updated _renderScreenData to handle smoothing and left/right sides
+
+  final double smoothingFactor = 0.2;
+  final double saturationBoost = 1.3; // Boost saturation by 30%
+  final int darkThreshold =
+      20; // Pixels with R,G,B values below this are treated as black
+  final double gamma = 2.2; // A common gamma value for sRGB color space
+
   List<int> _renderScreenData({
     required LedDevice device,
     required Uint8List pixelData,
     required int width,
     required int height,
-    required String side,
+    required DisplayPosition side,
+    required int startIndex,
+    required int endIndex,
   }) {
-    final int count = device.ledCount;
-    if (count == 0) return [0x02, 0x04];
-
     final List<int> packet = [0x02, 0x04];
-    final double smoothingFactor = 0.2; // Adjust for more or less smoothing
 
-    final int leftSectionWidth = (width * 0.1).round();
-
-    // Determine the xPosition based on the side
-    final int xPosition = side == 'left'
-        ? leftSectionWidth ~/ 2
-        : width - (leftSectionWidth ~/ 2);
-
-    // Initialize previous colors for this device if they don't exist
     _previousColors[device.id] ??= List.generate(
-      count,
-      (index) => const Color(0x00000000),
+      device.ledCount,
+      (_) => const Color(0x00000000),
     );
 
-    for (int i = 0; i < count; i++) {
-      final int yPosition = ((height * (count - 1 - i)) / count).round();
+    final int sectionThickness =
+        (side == DisplayPosition.left || side == DisplayPosition.right)
+        ? (width * 0.1).round()
+        : (height * 0.1).round();
 
-      if (xPosition < 0 ||
-          xPosition >= width ||
-          yPosition < 0 ||
-          yPosition >= height) {
+    // A helper function for gamma correction
+    int applyGamma(int value) {
+      // Normalize the value to a 0.0-1.0 range, apply gamma, then scale back to 0-255
+      double normalized = value / 255.0;
+      double corrected = pow(normalized, gamma) as double;
+      return (corrected * 255).round().clamp(0, 255);
+    }
+
+    // A helper function for saturation boost
+    Color applySaturationBoost(Color color) {
+      double r = double.parse(((color.r * 255.0).round() & 0xff).toString());
+      double g = double.parse(((color.g * 255.0).round() & 0xff).toString());
+      double b = double.parse(((color.b * 255.0).round() & 0xff).toString());
+      double l = 0.3 * r + 0.59 * g + 0.11 * b; // Calculate luminance
+
+      // Blend the color towards its luminance (gray) to increase saturation
+      r = l + saturationBoost * (r - l);
+      g = l + saturationBoost * (g - l);
+      b = l + saturationBoost * (b - l);
+
+      return Color.fromARGB(
+        255,
+        (r * 255).round().clamp(0, 255),
+        (g * 255).round().clamp(0, 255),
+        (b * 255).round().clamp(0, 255),
+      );
+    }
+
+    for (int i = 0; i < device.ledCount; i++) {
+      if (i < startIndex || i > endIndex) {
         packet.addAll([0, 0, 0]);
         continue;
       }
 
-      final int pixelIndex = (yPosition * width + xPosition) * 4;
+      double t =
+          (i - startIndex) /
+          ((endIndex - startIndex) > 0 ? (endIndex - startIndex) : 1);
+      int x = 0, y = 0;
 
-      if (pixelIndex + 3 < pixelData.length) {
-        // Get the new color from the screen
+      switch (side) {
+        case DisplayPosition.left:
+          x = sectionThickness ~/ 2;
+          y = height - (t * height).round().clamp(0, height - 1);
+          break;
+        case DisplayPosition.top:
+          x = (t * width).round().clamp(0, width - 1);
+          y = sectionThickness ~/ 2;
+          break;
+        case DisplayPosition.right:
+          x = width - (sectionThickness ~/ 2);
+          y = height - (t * height).round().clamp(0, height - 1);
+          break;
+        case DisplayPosition.bottom:
+          x = (t * width).round().clamp(0, width - 1);
+          y = height - (sectionThickness ~/ 2);
+          break;
+      }
+
+      final int pixelIndex = (y * width + x) * 4;
+
+      if (pixelIndex >= 0 && pixelIndex + 3 < pixelData.length) {
         final int newR = pixelData[pixelIndex];
         final int newG = pixelData[pixelIndex + 1];
         final int newB = pixelData[pixelIndex + 2];
 
-        // Get the previous color for smoothing
+        if (newR < darkThreshold &&
+            newG < darkThreshold &&
+            newB < darkThreshold) {
+          packet.addAll([0, 0, 0]);
+          _previousColors[device.id]![i] = const Color.fromARGB(255, 0, 0, 0);
+          continue;
+        }
+
+        Color newColor = Color.fromARGB(255, newR, newG, newB);
+
+        // Apply gamma correction to the sampled color
+        final int gammaR = applyGamma(newColor.red);
+        final int gammaG = applyGamma(newColor.green);
+        final int gammaB = applyGamma(newColor.blue);
+        newColor = Color.fromARGB(255, gammaR, gammaG, gammaB);
+
+        // Apply a simple saturation boost to the gamma-corrected color
+        Color boostedColor = applySaturationBoost(newColor);
+
         final Color previousColor = _previousColors[device.id]![i];
 
-        // Perform exponential moving average (EMA) smoothing
         final int r =
-            ((((previousColor.r * 255.0).round() & 0xff) *
-                        (1 - smoothingFactor)) +
-                    (newR * smoothingFactor))
+            ((previousColor.red * (1 - smoothingFactor)) +
+                    (boostedColor.red * smoothingFactor))
                 .round();
         final int g =
-            ((((previousColor.g * 255.0).round() & 0xff) *
-                        (1 - smoothingFactor)) +
-                    (newG * smoothingFactor))
+            ((previousColor.green * (1 - smoothingFactor)) +
+                    (boostedColor.green * smoothingFactor))
                 .round();
         final int b =
-            ((((previousColor.b * 255.0).round() & 0xff) *
-                        (1 - smoothingFactor)) +
-                    (newB * smoothingFactor))
+            ((previousColor.blue * (1 - smoothingFactor)) +
+                    (boostedColor.blue * smoothingFactor))
                 .round();
 
         packet.addAll([r, g, b]);
-
-        // Update the previous color for the next frame
         _previousColors[device.id]![i] = Color.fromARGB(255, r, g, b);
       } else {
         packet.addAll([0, 0, 0]);
+        _previousColors[device.id]![i] = const Color.fromARGB(255, 0, 0, 0);
       }
     }
 

@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:udp_master/screen/effects.dart';
 import 'package:udp_master/screen/home.dart';
+import 'package:udp_master/screen/screen_sync_config.dart';
 import 'package:udp_master/screen/simulator_page.dart';
-import 'package:udp_master/screen/screen_stream.dart';
+import 'package:udp_master/screen/screen_capture.dart';
 import 'package:udp_master/services/discover.dart';
 
 import 'services/visualizer_provider.dart';
@@ -62,14 +63,11 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
       appBar: AppBar(
         title: const Icon(Icons.lightbulb, size: 36),
         actions: [
-            IconButton(
+          IconButton(
             onPressed: () => {
-               Navigator.push(
+              Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      ScreenCapturePage(),
-                ),
+                MaterialPageRoute(builder: (context) => ScreenCapturePage()),
               ),
             },
             icon: const Icon(Icons.video_call),
@@ -123,6 +121,11 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
               icon: Icon(Icons.strikethrough_s_sharp),
               label: "Simulator",
             ),
+            NavigationDestination(
+              selectedIcon: Icon(Icons.sync),
+              icon: Icon(Icons.sync_outlined),
+              label: "Sync Config",
+            ),
           ],
         ),
       ),
@@ -135,6 +138,7 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
             Home(visualizerProvider: provider),
             EffectsPage(visualizerProvider: provider),
             SimulatorPage(visualizerProvider: provider),
+            DisplaySyncConfigPage(visualizerProvider: provider),
           ],
         ),
       ),

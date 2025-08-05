@@ -8,8 +8,8 @@ enum DeviceType {
   esphome('ESP Home', 21324),
   tuya('Tuya', 21324);
 
-  const DeviceType(this.name, this.port);
-  final String name;
+  const DeviceType(this.label, this.port);
+  final String label;
   final int port;
 }
 
@@ -69,16 +69,27 @@ class LedDevice {
 
   factory LedDevice.fromJson(Map<String, dynamic> json) {
     return LedDevice(
-      id: json['id'],
-      name: json['name'],
-      ip: json['ip'],
-      port: json['port'],
-      ledCount: json['ledCount'],
-      effect: json['effect'],
-      isEffectEnabled: json['isEffectEnabled'],
-      type: DeviceType.values.firstWhere((type) => type.name == json['type']),
+      id: json['id'] as String,
+      name: json['name'] as String,
+      ip: json['ip'] as String,
+      port: json['port'] as int,
+      ledCount: json['ledCount'] as int,
+      effect: json['effect'] as String,
+      isEffectEnabled: json['isEffectEnabled'] as bool,
+      type: DeviceType.values.firstWhere(
+        (type) => type.name == json['type'],
+        orElse: () => DeviceType.wled, // fallback if unknown
+      ),
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LedDevice && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 class LedEffect {
@@ -96,8 +107,8 @@ class LedEffect {
 
   factory LedEffect.fromJson(Map<String, dynamic> json) {
     return LedEffect(
-      id: json['id'],
-      name: json['name'],
+      id: json['id'] as String,
+      name: json['name'] as String,
       parameters: (json['parameters'] as Map<String, dynamic>).map(
         (k, v) => MapEntry(k, Map<String, dynamic>.from(v as Map)),
       ),
@@ -113,6 +124,51 @@ class LedEffect {
       id: id ?? this.id,
       name: name ?? this.name,
       parameters: parameters ?? this.parameters,
+    );
+  }
+}
+
+enum DisplayPosition { left, right, top, bottom }
+
+class DisplaySide {
+  final DisplayPosition position;
+  final LedDevice? device;
+  final int startIndex;
+  final int endIndex;
+
+  DisplaySide({
+    required this.position,
+    this.device,
+    required this.startIndex,
+    required this.endIndex,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'position': position.name,
+    'device': device?.toJson(),
+    'startIndex': startIndex,
+    'endIndex': endIndex,
+  };
+
+  factory DisplaySide.fromJson(Map<String, dynamic> json) {
+    return DisplaySide(
+      position: DisplayPosition.values.firstWhere(
+        (e) => e.name == json['position'],
+      ),
+      device: json['device'] != null
+          ? LedDevice.fromJson(json['device'] as Map<String, dynamic>)
+          : null,
+      startIndex: json['startIndex'] as int,
+      endIndex: json['endIndex'] as int,
+    );
+  }
+
+  DisplaySide copyWith({LedDevice? device, int? startIndex, int? endIndex}) {
+    return DisplaySide(
+      position: position,
+      device: device ?? this.device,
+      startIndex: startIndex ?? this.startIndex,
+      endIndex: endIndex ?? this.endIndex,
     );
   }
 }

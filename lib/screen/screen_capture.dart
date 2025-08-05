@@ -22,7 +22,7 @@ class ScreenCapturePage extends StatefulWidget {
 class _ScreenCapturePageState extends State<ScreenCapturePage> {
   MediaStream? _localStream;
   final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
-  bool _inCalling = false;
+  bool _isScreenCapturing = false;
   DesktopCapturerSource? selectedSource;
   final GlobalKey videoKey = GlobalKey();
 
@@ -35,7 +35,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
   @override
   void deactivate() {
     super.deactivate();
-    if (_inCalling) {
+    if (_isScreenCapturing) {
       _stop();
     }
     _localRenderer.dispose();
@@ -52,13 +52,13 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
         builder: (context) => ScreenSelectDialog(),
       );
       if (source != null) {
-        await _makeCall(source);
+        await _startScreenCapture(source);
       }
     }
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> _makeCall(DesktopCapturerSource? source) async {
+  Future<void> _startScreenCapture(DesktopCapturerSource? source) async {
     setState(() {
       selectedSource = source;
     });
@@ -95,7 +95,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
     if (!mounted) return;
 
     setState(() {
-      _inCalling = true;
+      _isScreenCapturing = true;
     });
   }
 
@@ -116,10 +116,10 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
     }
   }
 
-  Future<void> _hangUp() async {
+  Future<void> _stopScreenCapturing() async {
     await _stop();
     setState(() {
-      _inCalling = false;
+      _isScreenCapturing = false;
     });
   }
 
@@ -130,34 +130,32 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
       body: OrientationBuilder(
         builder: (context, orientation) {
           return Center(
-            child: Container(
-              width: MediaQuery.of(context).size.width,
-              color: Colors.white10,
-              child: Stack(
-                children: <Widget>[
-                  if (_inCalling)
-                    RepaintBoundary(
-                      key: videoKey,
-                      child: Container(
-                        margin: EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 0.0),
-                        width: MediaQuery.of(context).size.width,
-                        height: MediaQuery.of(context).size.height,
-                        decoration: BoxDecoration(color: Colors.black54),
-                        child: RTCVideoView(_localRenderer),
-                      ),
+            child: Stack(
+              children: <Widget>[
+                if (_isScreenCapturing)
+                  RepaintBoundary(
+                    key: videoKey,
+                    child: Container(
+                      margin: EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 0.0),
+                      width: MediaQuery.of(context).size.width,
+                      height: MediaQuery.of(context).size.height,
+                      decoration: BoxDecoration(color: Colors.black54),
+                      child: RTCVideoView(_localRenderer),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          _inCalling ? _hangUp() : selectScreenSourceDialog(context);
+          _isScreenCapturing
+              ? _stopScreenCapturing()
+              : selectScreenSourceDialog(context);
         },
-        tooltip: _inCalling ? 'Hangup' : 'Call',
-        child: Icon(_inCalling ? Icons.call_end : Icons.phone),
+        tooltip: _isScreenCapturing ? 'Hangup' : 'Call',
+        child: Icon(_isScreenCapturing ? Icons.call_end : Icons.phone),
       ),
     );
   }
