@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/screen/add_device.dart';
 import 'package:udp_master/screen/device_details.dart';
@@ -9,24 +10,16 @@ import 'package:udp_master/services/visualizer_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class Home extends StatefulWidget {
-  final VisualizerProvider visualizerProvider;
-
-  const Home({super.key, required this.visualizerProvider});
+  const Home({super.key});
 
   @override
   State<Home> createState() => _HomeState();
 }
 
 class _HomeState extends State<Home> {
-  late String _selectedGlobalEffect;
   final List<String> _sortOptions = ['Name', 'IP'];
   String _selectedSortOption = 'Name';
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedGlobalEffect = widget.visualizerProvider.globalEffectId;
-  }
+  String? _selectedGlobalEffect;
 
   Future<void> _launchUrl(LedDevice device) async {
     final Uri uri = Uri.parse('http://${device.ip}');
@@ -36,11 +29,11 @@ class _HomeState extends State<Home> {
   }
 
   void _applyGlobalEffect(String effectId) {
-    widget.visualizerProvider.setGlobalEffect(effectId);
+    final provider = Provider.of<VisualizerProvider>(context, listen: false);
+    provider.setGlobalEffect(effectId);
   }
 
-  List<LedDevice> _getSortedDevices() {
-    final devices = widget.visualizerProvider.devices;
+  List<LedDevice> _getSortedDevices(List<LedDevice> devices) {
     if (_selectedSortOption == 'IP') {
       return [...devices]..sort((a, b) => a.ip.compareTo(b.ip));
     }
@@ -49,7 +42,11 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
-    final devices = _getSortedDevices();
+    final provider = context.watch<VisualizerProvider>();
+    final devices = _getSortedDevices(provider.devices);
+
+    // Sync selected effect with provider if needed
+    _selectedGlobalEffect ??= provider.globalEffectId;
 
     return Padding(
       padding: const EdgeInsets.all(8.0),
@@ -58,14 +55,14 @@ class _HomeState extends State<Home> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 8),
-            _buildHeaderControls(),
+            _buildHeaderControls(provider),
             const SizedBox(height: 12),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: devices.length,
               itemBuilder: (context, index) =>
-                  _buildDeviceCard(context, devices[index]),
+                  _buildDeviceCard(context, devices[index], provider),
             ),
           ],
         ),
@@ -73,7 +70,7 @@ class _HomeState extends State<Home> {
     );
   }
 
-  Widget _buildHeaderControls() {
+  Widget _buildHeaderControls(VisualizerProvider provider) {
     return Row(
       children: [
         Expanded(
@@ -108,7 +105,7 @@ class _HomeState extends State<Home> {
               prefixIcon: Icon(Icons.filter_vintage_outlined),
             ),
             value: _selectedGlobalEffect,
-            items: widget.visualizerProvider.effects
+            items: provider.effects
                 .map((e) => DropdownMenuItem(value: e.id, child: Text(e.name)))
                 .toList(),
             onChanged: (newEffectId) {
@@ -123,7 +120,11 @@ class _HomeState extends State<Home> {
     );
   }
 
-  Widget _buildDeviceCard(BuildContext context, LedDevice device) {
+  Widget _buildDeviceCard(
+    BuildContext context,
+    LedDevice device,
+    VisualizerProvider provider,
+  ) {
     return Dismissible(
       key: ValueKey(device.name + device.ip + device.port.toString()),
       direction: DismissDirection.endToStart,
@@ -160,28 +161,28 @@ class _HomeState extends State<Home> {
           margin: const EdgeInsets.symmetric(vertical: 8),
           child: ExpansionTile(
             initiallyExpanded: true,
-            leading: Icon(Icons.lightbulb, size: 16),
+            leading: const Icon(Icons.lightbulb, size: 16),
             title: Text(
               device.name,
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            children: [
-              // Device Info
-              _buildDeviceDetails(context, device),
-            ],
+            children: [_buildDeviceDetails(context, device, provider)],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildDeviceDetails(BuildContext context, LedDevice device) {
+  Widget _buildDeviceDetails(
+    BuildContext context,
+    LedDevice device,
+    VisualizerProvider provider,
+  ) {
     final theme = Theme.of(context).colorScheme;
 
     return Padding(
       padding: const EdgeInsets.only(top: 8.0, bottom: 8, left: 16, right: 16),
       child: Column(
-        spacing: 4,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -196,8 +197,7 @@ class _HomeState extends State<Home> {
                   ).textTheme.bodySmall?.copyWith(color: theme.outline),
                 ),
               ),
-
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
               Icon(Icons.settings_ethernet, size: 16, color: theme.outline),
               const SizedBox(width: 4),
               Flexible(
@@ -210,7 +210,6 @@ class _HomeState extends State<Home> {
               ),
             ],
           ),
-
           Row(
             children: [
               Icon(Icons.linear_scale, size: 16, color: theme.outline),
@@ -223,13 +222,12 @@ class _HomeState extends State<Home> {
                   ).textTheme.bodySmall?.copyWith(color: theme.outline),
                 ),
               ),
-
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
               Icon(Icons.category, size: 16, color: theme.outline),
               const SizedBox(width: 4),
               Flexible(
                 child: Text(
-                  device.type.name.toString(),
+                  device.type.name,
                   style: Theme.of(
                     context,
                   ).textTheme.bodySmall?.copyWith(color: theme.outline),
@@ -237,18 +235,20 @@ class _HomeState extends State<Home> {
               ),
             ],
           ),
-
-          SizedBox(height: 8),
-          _buildDeviceControls(context, device),
+          const SizedBox(height: 8),
+          _buildDeviceControls(context, device, provider),
         ],
       ),
     );
   }
 
-  Widget _buildDeviceControls(BuildContext context, LedDevice device) {
-    final effects = widget.visualizerProvider.effects;
+  Widget _buildDeviceControls(
+    BuildContext context,
+    LedDevice device,
+    VisualizerProvider provider,
+  ) {
+    final effects = provider.effects;
     return Row(
-      spacing: 8,
       children: [
         Expanded(
           child: DropdownButtonFormField<String>(
@@ -273,7 +273,7 @@ class _HomeState extends State<Home> {
                 .toList(),
             onChanged: (val) {
               if (val != null) {
-                widget.visualizerProvider.deviceActions(
+                provider.deviceActions(
                   device.copyWith(effect: val),
                   DeviceAction.update,
                 );
@@ -281,7 +281,6 @@ class _HomeState extends State<Home> {
             },
           ),
         ),
-
         FilledButton(
           onPressed: () {
             showDialog(
@@ -289,11 +288,7 @@ class _HomeState extends State<Home> {
               useSafeArea: true,
               context: context,
               builder: (_) => Dialog(
-                child: AddDevice(
-                  visualizerProvider: widget.visualizerProvider,
-                  device: device,
-                  action: DeviceAction.update,
-                ),
+                child: AddDevice(device: device, action: DeviceAction.update),
               ),
             );
           },
@@ -301,7 +296,7 @@ class _HomeState extends State<Home> {
         ),
         FilledButton(
           onPressed: () {
-            widget.visualizerProvider.deviceActions(
+            provider.deviceActions(
               device.copyWith(isEffectEnabled: !device.isEffectEnabled),
               DeviceAction.update,
             );
@@ -318,6 +313,7 @@ class _HomeState extends State<Home> {
   }
 
   Future<bool> _confirmDelete(BuildContext context, LedDevice device) async {
+    final provider = Provider.of<VisualizerProvider>(context, listen: false);
     return await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
@@ -330,10 +326,7 @@ class _HomeState extends State<Home> {
               ),
               TextButton(
                 onPressed: () {
-                  widget.visualizerProvider.deviceActions(
-                    device,
-                    DeviceAction.delete,
-                  );
+                  provider.deviceActions(device, DeviceAction.delete);
                   Navigator.of(context).pop(true);
                 },
                 child: const Text(

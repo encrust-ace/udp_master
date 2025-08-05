@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/services/visualizer_provider.dart';
 
 class DisplaySyncConfigPage extends StatefulWidget {
-  final VisualizerProvider visualizerProvider;
-  const DisplaySyncConfigPage({super.key, required this.visualizerProvider});
+  const DisplaySyncConfigPage({super.key});
 
   @override
   State<DisplaySyncConfigPage> createState() => _DisplaySyncConfigPageState();
@@ -12,67 +12,62 @@ class DisplaySyncConfigPage extends StatefulWidget {
 
 class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
   late DisplayPosition _selectedSide;
   LedDevice? _selectedDevice;
-  final TextEditingController _startIndexController = TextEditingController(
-    text: '1',
-  );
-  final TextEditingController _endIndexController = TextEditingController(
-    text: '1',
-  );
-  List<DisplayPosition> _availableSides = [];
 
+  final TextEditingController _startIndexController = TextEditingController(text: '1');
+  final TextEditingController _endIndexController = TextEditingController(text: '1');
+
+  List<DisplayPosition> _availableSides = [];
   bool _isEditing = false;
 
-  Future<void> getAvailableSides({DisplayPosition? includeSide}) async {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadAvailableSides();
+  }
+
+  Future<void> _loadAvailableSides({DisplayPosition? includeSide}) async {
+    final provider = context.read<VisualizerProvider>();
+
     List<DisplayPosition> availableSides = DisplayPosition.values.where((side) {
-      return !widget.visualizerProvider.displaySides.any(
-        (s) => s.position == side,
-      );
+      return !provider.displaySides.any((s) => s.position == side);
     }).toList();
 
     if (includeSide != null && !availableSides.contains(includeSide)) {
       availableSides.add(includeSide);
     }
 
-    setState(() {
-      _availableSides = availableSides;
-    });
+    if (!mounted) return;
+    setState(() => _availableSides = availableSides);
+
+    if (_availableSides.isNotEmpty &&
+        _selectedDevice == null &&
+        provider.devices.isNotEmpty) {
+      final defaultDevice = provider.devices.firstWhere(
+        (device) => device.type == DeviceType.wled || device.type == DeviceType.esphome,
+        orElse: () => provider.devices.first,
+      );
+
+      initializeData(
+        DisplaySide(
+          position: _availableSides.first,
+          startIndex: 1,
+          endIndex: defaultDevice.ledCount,
+          device: defaultDevice,
+        ),
+      );
+    }
   }
 
   void initializeData(DisplaySide side, {bool isEditing = false}) {
     setState(() {
       _isEditing = isEditing;
-      _startIndexController.text = side.startIndex.toString();
-      _endIndexController.text = side.endIndex.toString(); // fixed typo
       _selectedSide = side.position;
       _selectedDevice = side.device;
-    });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await getAvailableSides();
-
-      if (_availableSides.isNotEmpty) {
-        final defaultDevice = widget.visualizerProvider.devices.firstWhere(
-          (device) =>
-              device.type == DeviceType.wled ||
-              device.type == DeviceType.esphome,
-          orElse: () => widget.visualizerProvider.devices.first,
-        );
-
-        final defaultSide = DisplaySide(
-          position: _availableSides.first,
-          startIndex: 1,
-          endIndex: defaultDevice.ledCount,
-          device: defaultDevice,
-        );
-
-        initializeData(defaultSide);
-      }
+      _startIndexController.text = side.startIndex.toString();
+      _endIndexController.text = side.endIndex.toString();
     });
   }
 
@@ -85,9 +80,10 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
 
   void _saveDisplaySide() {
     if (_selectedDevice == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Please select a device')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a device')),
+      );
       return;
     }
 
@@ -96,9 +92,10 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
       final endIndex = int.tryParse(_endIndexController.text);
 
       if (startIndex == null || endIndex == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Invalid start or end index')));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid start or end index')),
+        );
         return;
       }
 
@@ -109,8 +106,9 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
         endIndex: endIndex,
       );
 
-      widget.visualizerProvider.addOrUpdateDisplaySide(newSide);
+      context.read<VisualizerProvider>().addOrUpdateDisplaySide(newSide);
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${newSide.position.name} saved successfully')),
       );
@@ -121,58 +119,59 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<VisualizerProvider>();
+
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Column(
         children: [
-          ListView.builder(
-            shrinkWrap: true,
-            itemCount: widget.visualizerProvider.displaySides.length,
-            itemBuilder: (context, index) {
-              final edge = widget.visualizerProvider.displaySides[index];
-              return GestureDetector(
-                onTap: () async {
-                  // Ensure the edited side is in available sides
-                  await getAvailableSides(includeSide: edge.position);
+          Expanded(
+            child: ListView.builder(
+              itemCount: provider.displaySides.length,
+              itemBuilder: (context, index) {
+                final edge = provider.displaySides[index];
 
-                  // Initialize editing state
-                  initializeData(edge, isEditing: true);
+                return GestureDetector(
+                  onTap: () async {
+                    final localContext = context;
 
-                  // Delay the dialog to allow state to update
-                  await Future.delayed(Duration(milliseconds: 100));
+                    await _loadAvailableSides(includeSide: edge.position);
+                    initializeData(edge, isEditing: true);
 
-                  if (!mounted) return;
+                    if (!localContext.mounted) return;
 
-                  showDialog(
-                    barrierDismissible: false,
-                    context: context,
-                    builder: (_) => addOrEditForm(context),
-                  );
-                },
-
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Column(
-                      children: [
-                        buildRow(Icons.rounded_corner, edge.position.name),
-                        buildRow(Icons.light, edge.device?.name ?? ''),
-                        buildRow(Icons.join_left, edge.startIndex.toString()),
-                        buildRow(Icons.join_right, edge.endIndex.toString()),
-                      ],
+                    showDialog(
+                      context: localContext,
+                      barrierDismissible: false,
+                      builder: (_) => _buildAddEditDialog(localContext),
+                    );
+                  },
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        children: [
+                          _buildRow(Icons.rounded_corner, edge.position.name),
+                          _buildRow(Icons.light, edge.device?.name ?? ''),
+                          _buildRow(Icons.join_left, edge.startIndex.toString()),
+                          _buildRow(Icons.join_right, edge.endIndex.toString()),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
           const SizedBox(height: 12),
           IconButton(
+            icon: const Icon(Icons.add),
             onPressed: _availableSides.isEmpty
                 ? null
                 : () {
-                    final defaultDevice =
-                        widget.visualizerProvider.devices.first;
+                    final localContext = context;
+                    final defaultDevice = provider.devices.first;
+
                     initializeData(
                       DisplaySide(
                         position: _availableSides.first,
@@ -183,24 +182,27 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
                       isEditing: false,
                     );
 
+                    if (!localContext.mounted) return;
+
                     showDialog(
+                      context: localContext,
                       barrierDismissible: false,
-                      context: context,
-                      builder: (_) => addOrEditForm(context),
+                      builder: (_) => _buildAddEditDialog(localContext),
                     );
                   },
-            icon: Icon(Icons.add),
           ),
         ],
       ),
     );
   }
 
-  Row buildRow(IconData icon, String text) {
-    return Row(children: [Icon(icon), SizedBox(width: 4), Text(text)]);
+  Row _buildRow(IconData icon, String text) {
+    return Row(children: [Icon(icon), const SizedBox(width: 4), Text(text)]);
   }
 
-  Dialog addOrEditForm(BuildContext context) {
+  Dialog _buildAddEditDialog(BuildContext context) {
+    final provider = context.read<VisualizerProvider>();
+
     return Dialog(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -211,88 +213,62 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
               DropdownButtonFormField<DisplayPosition>(
                 isExpanded: true,
                 hint: const Text("Select Side"),
-                value: _availableSides.contains(_selectedSide)
-                    ? _selectedSide
-                    : null,
+                value: _availableSides.contains(_selectedSide) ? _selectedSide : null,
                 decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    vertical: 9,
-                    horizontal: 8,
-                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
                 ),
                 items: _availableSides
-                    .map(
-                      (side) =>
-                          DropdownMenuItem(value: side, child: Text(side.name)),
-                    )
+                    .map((side) => DropdownMenuItem(value: side, child: Text(side.name)))
                     .toList(),
                 onChanged: (val) {
                   if (val != null) {
-                    setState(() {
-                      _selectedSide = val;
-                    });
+                    setState(() => _selectedSide = val);
                   }
                 },
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<LedDevice>(
                 isExpanded: true,
-                hint: Text("Select Device"),
+                hint: const Text("Select Device"),
                 value: _selectedDevice,
                 decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    vertical: 9,
-                    horizontal: 8,
-                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
                 ),
-                items: widget.visualizerProvider.devices
-                    .map(
-                      (device) => DropdownMenuItem(
-                        value: device,
-                        child: Text(device.name),
-                      ),
-                    )
+                items: provider.devices
+                    .map((device) => DropdownMenuItem(
+                          value: device,
+                          child: Text(device.name),
+                        ))
                     .toList(),
                 onChanged: (val) {
                   if (val != null) {
-                    setState(() {
-                      _selectedDevice = val;
-                    });
+                    setState(() => _selectedDevice = val);
                   }
                 },
               ),
-
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
                     child: TextFormField(
                       controller: _startIndexController,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: "Start Index",
                         hintText: "1",
                         prefixIcon: Icon(Icons.join_left),
-                        border: const OutlineInputBorder(),
+                        border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         final n = int.tryParse(value ?? '');
-                        final end =
-                            int.tryParse(_endIndexController.text) ??
+                        final end = int.tryParse(_endIndexController.text) ??
                             _selectedDevice?.ledCount ??
                             1;
-                        if (n == null ||
-                            n <= 0 ||
-                            n > (_selectedDevice?.ledCount ?? 1) ||
-                            n > end) {
+                        if (n == null || n <= 0 || n > end) {
                           return 'Invalid start index';
                         }
                         return null;
@@ -303,21 +279,18 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
                   Expanded(
                     child: TextFormField(
                       controller: _endIndexController,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         labelText: "End Index",
                         hintText: "1",
                         prefixIcon: Icon(Icons.join_right),
-                        border: const OutlineInputBorder(),
+                        border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
                       validator: (value) {
                         final n = int.tryParse(value ?? '');
-                        final start =
-                            int.tryParse(_startIndexController.text) ?? 1;
-                        if (n == null ||
-                            n <= 0 ||
-                            n > (_selectedDevice?.ledCount ?? 1) ||
-                            n < start) {
+                        final start = int.tryParse(_startIndexController.text) ?? 1;
+                        final max = _selectedDevice?.ledCount ?? 1;
+                        if (n == null || n < start || n > max) {
                           return 'Invalid end index';
                         }
                         return null;
@@ -331,9 +304,7 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
                 children: [
                   Expanded(
                     child: TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
+                      onPressed: () => Navigator.pop(context),
                       child: const Text("Cancel"),
                     ),
                   ),

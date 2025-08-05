@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/services/visualizer_provider.dart';
 
 class AddDevice extends StatefulWidget {
-  final VisualizerProvider visualizerProvider;
   final LedDevice device;
   final DeviceAction action;
 
   const AddDevice({
     super.key,
-    required this.visualizerProvider,
     required this.device,
     required this.action,
   });
@@ -32,9 +31,13 @@ class _AddDeviceState extends State<AddDevice> {
   void initState() {
     super.initState();
     final d = widget.device;
-    _selectedEffect = d.effect != ""
-        ? widget.visualizerProvider.getEffectById(d.effect)
-        : widget.visualizerProvider.effects.first;
+
+    final provider = Provider.of<VisualizerProvider>(context, listen: false);
+
+    _selectedEffect = d.effect.isNotEmpty
+        ? provider.getEffectById(d.effect)
+        : provider.effects.first;
+
     _nameController.text = d.name;
     _ipController.text = d.ip;
     _ledCountController.text = d.ledCount.toString();
@@ -54,6 +57,8 @@ class _AddDeviceState extends State<AddDevice> {
   void _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
+    final provider = Provider.of<VisualizerProvider>(context, listen: false);
+
     final device = LedDevice(
       id: widget.device.id,
       name: _nameController.text.trim(),
@@ -65,14 +70,12 @@ class _AddDeviceState extends State<AddDevice> {
       port: int.parse(_portController.text.trim()),
     );
 
-    final message = await widget.visualizerProvider.deviceActions(
-      device,
-      widget.action,
-    );
+    final message = await provider.deviceActions(device, widget.action);
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
 
     if (message.contains("successfully")) {
       Navigator.of(context).pop();
@@ -94,32 +97,28 @@ class _AddDeviceState extends State<AddDevice> {
 
   @override
   Widget build(BuildContext context) {
+    final provider = Provider.of<VisualizerProvider>(context, listen: false);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 24,
           children: [
             // Name & LED count
             Row(
-              spacing: 12,
               children: [
                 Expanded(
                   flex: 3,
                   child: TextFormField(
                     controller: _nameController,
-                    decoration: _inputDecoration(
-                      "Name",
-                      Icons.label,
-                      "Staircase",
-                    ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Required'
-                        : null,
+                    decoration: _inputDecoration("Name", Icons.label, "Staircase"),
+                    validator: (value) =>
+                        value == null || value.trim().isEmpty ? 'Required' : null,
                   ),
                 ),
+                const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
                   child: TextFormField(
@@ -135,36 +134,28 @@ class _AddDeviceState extends State<AddDevice> {
                 ),
               ],
             ),
+            const SizedBox(height: 24),
+
             // IP & Port
             Row(
-              spacing: 12,
               children: [
                 Expanded(
                   flex: 3,
                   child: TextFormField(
                     controller: _ipController,
-                    decoration: _inputDecoration(
-                      "IP Address",
-                      Icons.computer,
-                      "192.168.1.100",
-                    ),
-                    keyboardType: TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Required'
-                        : null,
+                    decoration: _inputDecoration("IP Address", Icons.computer, "192.168.1.100"),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) =>
+                        value == null || value.trim().isEmpty ? 'Required' : null,
                   ),
                 ),
+                const SizedBox(width: 12),
                 Expanded(
                   flex: 2,
                   child: TextFormField(
                     readOnly: true,
                     controller: _portController,
-                    decoration: _inputDecoration(
-                      "Port",
-                      Icons.settings_ethernet,
-                    ),
+                    decoration: _inputDecoration("Port", Icons.settings_ethernet),
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       final n = int.tryParse(value ?? '');
@@ -175,34 +166,36 @@ class _AddDeviceState extends State<AddDevice> {
                 ),
               ],
             ),
-            // Device Type
+            const SizedBox(height: 24),
+
+            // Effect Dropdown
             DropdownButtonFormField<LedEffect>(
               decoration: _inputDecoration("Effect", Icons.style),
               value: _selectedEffect,
-              items: widget.visualizerProvider.effects
-                  .map(
-                    (type) =>
-                        DropdownMenuItem(value: type, child: Text(type.name)),
-                  )
+              items: provider.effects
+                  .map((effect) => DropdownMenuItem(
+                        value: effect,
+                        child: Text(effect.name),
+                      ))
                   .toList(),
               onChanged: (val) {
                 if (val != null) {
-                  setState(() {
-                    _selectedEffect = val;
-                  });
+                  setState(() => _selectedEffect = val);
                 }
               },
-              validator: (value) => value == null ? 'Select device type' : null,
+              validator: (value) => value == null ? 'Select effect' : null,
             ),
+            const SizedBox(height: 24),
 
+            // Device Type Dropdown
             DropdownButtonFormField<DeviceType>(
               decoration: _inputDecoration("Device Type", Icons.device_hub),
               value: _selectedDeviceType,
               items: DeviceType.values
-                  .map(
-                    (type) =>
-                        DropdownMenuItem(value: type, child: Text(type.name)),
-                  )
+                  .map((type) => DropdownMenuItem(
+                        value: type,
+                        child: Text(type.name),
+                      ))
                   .toList(),
               onChanged: (val) {
                 if (val != null) {
@@ -214,8 +207,9 @@ class _AddDeviceState extends State<AddDevice> {
               },
               validator: (value) => value == null ? 'Select device type' : null,
             ),
+            const SizedBox(height: 24),
 
-            // Actions
+            // Action Buttons
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -226,11 +220,9 @@ class _AddDeviceState extends State<AddDevice> {
                 const SizedBox(width: 12),
                 ElevatedButton(
                   onPressed: _submit,
-                  child: Text(
-                    widget.action == DeviceAction.add
-                        ? "Add Device"
-                        : "Update Device",
-                  ),
+                  child: Text(widget.action == DeviceAction.add
+                      ? "Add Device"
+                      : "Update Device"),
                 ),
               ],
             ),

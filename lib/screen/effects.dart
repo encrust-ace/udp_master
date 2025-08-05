@@ -1,37 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/services/visualizer_provider.dart';
 
 class EffectsPage extends StatelessWidget {
-  final VisualizerProvider visualizerProvider;
-  const EffectsPage({super.key, required this.visualizerProvider});
+  const EffectsPage({super.key});
 
-  Future<bool> resetEffect(LedEffect effect) {
-    final resp = visualizerProvider.resetEffect(effect);
-    return resp;
+  void resetEffect(BuildContext context, LedEffect effect) {
+    final provider = context.read<VisualizerProvider>();
+    provider.resetEffect(effect);
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<VisualizerProvider>();
+    final effects = provider.effects;
+
     return ListView.builder(
       padding: const EdgeInsets.all(8),
-      itemCount: visualizerProvider.effects.length,
+      itemCount: effects.length,
       itemBuilder: (context, effectIndex) {
-        final effect = visualizerProvider.effects[effectIndex];
+        final effect = effects[effectIndex];
 
         return Card(
           elevation: 4,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           margin: const EdgeInsets.symmetric(vertical: 8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: 18.0,
-              horizontal: 18.0,
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 18.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-
               children: [
+                // Header row with name and reset button
                 Row(
                   children: [
                     Icon(
@@ -43,27 +43,30 @@ class EffectsPage extends StatelessWidget {
                     Expanded(
                       child: Text(
                         effect.name,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                     ),
                     IconButton(
-                      onPressed: () {
-                        resetEffect(effect);
-                      },
-                      icon: Icon(Icons.restore),
+                      onPressed: () => resetEffect(context, effect),
+                      icon: const Icon(Icons.restore),
+                      tooltip: 'Reset to default',
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
+
+                // Sliders for each parameter
                 ...effect.parameters.entries.map((entry) {
                   final key = entry.key;
-                  final value = entry.value;
-                  final double min = value["min"];
-                  final double max = value["max"];
-                  final int steps = value["steps"] ?? 20;
-                  final double currentValue = value["value"];
-                  final double defaultValue = value["default"];
+                  final param = entry.value;
+
+                  final double min = (param["min"] ?? 0.0).toDouble();
+                  final double max = (param["max"] ?? 1.0).toDouble();
+                  final double currentValue = (param["value"] ?? 0.0).toDouble();
+                  final double defaultValue = (param["default"] ?? 0.0).toDouble();
+                  final int steps = (param["steps"] ?? 20).toInt();
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
@@ -79,13 +82,17 @@ class EffectsPage extends StatelessWidget {
                             max: max,
                             divisions: steps,
                             onChanged: (val) {
-                              visualizerProvider.updateEffect(effect, key, {
-                                "min": min,
-                                "max": max,
-                                "value": val,
-                                "steps": steps,
-                                "default": defaultValue,
-                              });
+                              context.read<VisualizerProvider>().updateEffect(
+                                    effect,
+                                    key,
+                                    {
+                                      "min": min,
+                                      "max": max,
+                                      "value": val,
+                                      "steps": steps,
+                                      "default": defaultValue,
+                                    },
+                                  );
                             },
                           ),
                         ),

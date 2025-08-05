@@ -109,8 +109,11 @@ class BroadcastProtocol {
   }
 }
 
+// ... existing imports remain the same ...
+
 class DeviceScanPage extends StatefulWidget {
   final VisualizerProvider visualizerProvider;
+
   const DeviceScanPage({super.key, required this.visualizerProvider});
 
   @override
@@ -122,7 +125,7 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
   bool isScanning = false;
   String? errorMessage;
   String broadcastAddress = "255.255.255.255";
-  int waitTime = 5;
+  int waitTime = defaultWaitTime;
   DeviceType deviceType = DeviceType.wled;
 
   @override
@@ -137,111 +140,67 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
     super.dispose();
   }
 
-  void _onVisualizerProviderUpdate() {
-    setState(() {});
-  }
+  void _onVisualizerProviderUpdate() => setState(() {});
 
-  Future<List<dynamic>> _discoverDevices({
-    required DeviceType deviceType,
-    String broadcastSpace = "255.255.255.255",
-    int waitTime = defaultWaitTime,
-  }) async {
-    if (deviceType == DeviceType.wled || deviceType == DeviceType.esphome) {
-      final List<Device> foundDevices = [];
-      final BonsoirDiscovery discovery = BonsoirDiscovery(
-        type: deviceType == DeviceType.wled ? "_wled._tcp" : "_esphomelib._tcp",
-      );
-
-      await discovery.initialize();
-      await discovery.start();
-
-      // Use a Completer and a Timer to control the discovery duration
-      final completer = Completer<List<Device>>();
-      final timer = Timer(Duration(seconds: waitTime), () {
-        if (!completer.isCompleted) {
-          completer.complete(foundDevices);
-        }
-      });
-
-      discovery.eventStream!.listen((event) {
-        if (event.service == null) {
-          return;
-        }
-
-        // The event types are defined internally in Bonsoir and are not public enums.
-        // We must compare against the internal integer values or rely on service properties.
-        // This is a known issue with the bonsoir API, but we can make it work.
-        // Based on the bonsoir internal logic, a service with a host and port
-        // is a resolved service.
-        final service = event.service!;
-        if (service.host != null) {
-          // This is the most reliable check for a resolved service
-          debugPrint('Resolved service found: ${service.toJson()}');
-          final isDuplicate = foundDevices.any(
-            (device) => device.ip == service.host,
-          );
-          if (!isDuplicate) {
-            foundDevices.add(
-              Device(
-                name: service.name,
-                ip: service.host!,
-                port: deviceType.port,
-                mac: service.attributes['mac'],
-              ),
-            );
-          }
-        } else {
-          // A service without host/port is an unresolved service,
-          // so we ask bonsoir to resolve it.
-          debugPrint(
-            'Unresolved service found, resolving: ${service.toJson()}',
-          );
-          service.resolve(discovery.serviceResolver);
-        }
-      });
-
-      final result = await completer.future;
-      await discovery.stop();
-      timer.cancel();
-      return result;
-    } else if (deviceType == DeviceType.wiz) {
-      // Wiz discovery logic
-      final BroadcastProtocol broadcastProtocol = BroadcastProtocol(
-        broadcastSpace,
-        waitTime,
-        deviceType,
-      );
-
-      await broadcastProtocol.broadcastRegistration();
-      return broadcastProtocol.discoveryBulbs;
+  Future<List<Device>> _discoverDevices() async {
+    switch (deviceType) {
+      case DeviceType.wled:
+      case DeviceType.esphome:
+        return _discoverBonsoirDevices();
+      case DeviceType.wiz:
+        return _discoverWizDevices();
+      default:
+        return [];
     }
-
-    return [];
   }
 
-  Future<List<Device>> _findWizLights({
-    String broadcastSpace = "255.255.255.255",
-    int waitTime = defaultWaitTime,
-  }) async {
-    final List<DiscoveredDevice> discoveredIPs =
-        await _discoverDevices(
-              broadcastSpace: broadcastSpace,
-              waitTime: waitTime,
-              deviceType: deviceType,
-            )
-            as List<DiscoveredDevice>;
-
-    return discoveredIPs
-        .map((e) => Device(ip: e.ip, port: deviceType.port, mac: e.mac))
-        .toList();
-  }
-
-  Future<List<Device>> _findWledLights({int waitTime = defaultWaitTime}) async {
-    final List<dynamic> discoveredDevices = await _discoverDevices(
-      waitTime: waitTime,
-      deviceType: deviceType,
+  Future<List<Device>> _discoverBonsoirDevices() async {
+    final List<Device> foundDevices = [];
+    final discovery = BonsoirDiscovery(
+      type: deviceType == DeviceType.wled ? "_wled._tcp" : "_esphomelib._tcp",
     );
-    return discoveredDevices.cast<Device>(); // Cast the result
+
+    await discovery.initialize();
+    await discovery.start();
+
+    final completer = Completer<List<Device>>();
+    final timer = Timer(Duration(seconds: waitTime), () {
+      if (!completer.isCompleted) completer.complete(foundDevices);
+    });
+
+    discovery.eventStream!.listen((event) {
+      final service = event.service;
+      if (service == null) return;
+
+      if (service.host != null) {
+        final alreadyExists = foundDevices.any((d) => d.ip == service.host);
+        if (!alreadyExists) {
+          foundDevices.add(
+            Device(
+              name: service.name,
+              ip: service.host!,
+              port: deviceType.port,
+              mac: service.attributes['mac'],
+            ),
+          );
+        }
+      } else {
+        service.resolve(discovery.serviceResolver);
+      }
+    });
+
+    final results = await completer.future;
+    timer.cancel();
+    await discovery.stop();
+    return results;
+  }
+
+  Future<List<Device>> _discoverWizDevices() async {
+    final protocol = BroadcastProtocol(broadcastAddress, waitTime, deviceType);
+    await protocol.broadcastRegistration();
+    return protocol.discoveryBulbs
+        .map((d) => Device(ip: d.ip, port: deviceType.port, mac: d.mac))
+        .toList();
   }
 
   Future<void> _scanForDevices() async {
@@ -252,54 +211,32 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
     });
 
     try {
-      List<dynamic> foundDevices;
-      if (deviceType == DeviceType.wled || deviceType == DeviceType.esphome) {
-        final wledDevices = await _findWledLights(waitTime: waitTime);
-        foundDevices = wledDevices;
-      } else if (deviceType == DeviceType.wiz) {
-        foundDevices = await _findWizLights(
-          broadcastSpace: broadcastAddress,
-          waitTime: waitTime,
-        );
-      } else {
-        foundDevices = [];
-      }
+      final devices = await _discoverDevices();
 
       setState(() {
-        discoveredDevices = foundDevices.map((d) {
-          if (d is Device) {
-            return Device(name: d.name, ip: d.ip, port: d.port, mac: d.mac);
-          }
-          return d as Device;
-        }).toList();
-
+        discoveredDevices = devices;
         isScanning = false;
       });
 
-      if (foundDevices.isEmpty) {
-        setState(() {
-          errorMessage =
-              'No devices of type ${deviceType.name} found on the network.';
-        });
+      if (devices.isEmpty) {
+        errorMessage = 'No ${deviceType.name} devices found.';
       } else {
-        _showSnackBar('Found ${foundDevices.length} devices!');
+        _showSnackBar('Found ${devices.length} device(s).');
       }
     } catch (e) {
       setState(() {
         isScanning = false;
-        errorMessage = 'Error during discovery: ${e.toString()}';
+        errorMessage = 'Discovery failed: ${e.toString()}';
       });
     }
   }
 
-  void _showAddDeviceDialog(BuildContext context, Device device) {
+  void _showAddDeviceDialog(Device device) {
     showDialog(
-      barrierDismissible: false,
-      useSafeArea: true,
       context: context,
+      barrierDismissible: false,
       builder: (_) => Dialog(
         child: AddDevice(
-          visualizerProvider: widget.visualizerProvider,
           device: LedDevice(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
             name: device.name ?? 'Unknown',
@@ -316,36 +253,62 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
     );
   }
 
+  void _clearResults() {
+    setState(() {
+      discoveredDevices.clear();
+      errorMessage = null;
+    });
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.grey.shade600),
+          const SizedBox(width: 8),
+          Text(
+            '$label:',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan devices')),
+      appBar: AppBar(title: const Text('Scan Devices')),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
-          spacing: 16,
           children: [
             Row(
-              spacing: 8,
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     value: deviceType.name,
                     decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 12,
-                      ),
+                      border: OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.all(12),
                     ),
                     items: DeviceType.values
                         .map(
-                          (deviceType) => DropdownMenuItem(
-                            value: deviceType.name,
-                            child: Text(deviceType.name),
+                          (type) => DropdownMenuItem(
+                            value: type.name,
+                            child: Text(type.name),
                           ),
                         )
                         .toList(),
@@ -353,23 +316,24 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                       if (val != null) {
                         setState(() {
                           deviceType = DeviceType.values.firstWhere(
-                            (dt) => dt.name == val,
+                            (d) => d.name == val,
                           );
                         });
                       }
                     },
                   ),
                 ),
+                const SizedBox(width: 12),
                 ElevatedButton(
                   onPressed: isScanning ? null : _scanForDevices,
                   style: ElevatedButton.styleFrom(
-                    fixedSize: Size(44, 44),
+                    fixedSize: const Size(44, 44),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                   child: isScanning
-                      ? SizedBox(
+                      ? const SizedBox(
                           height: 12,
                           width: 12,
                           child: CircularProgressIndicator(strokeWidth: 2),
@@ -378,16 +342,17 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 16),
 
             if (errorMessage != null)
               Card(
                 color: Colors.red.shade50,
                 child: Padding(
-                  padding: const EdgeInsets.all(12.0),
+                  padding: const EdgeInsets.all(12),
                   child: Row(
-                    spacing: 8,
                     children: [
                       Icon(Icons.error, color: Colors.red.shade700),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           errorMessage!,
@@ -398,10 +363,9 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                   ),
                 ),
               ),
-            // Results Header
-            if (discoveredDevices.isNotEmpty) ...[
+
+            if (discoveredDevices.isNotEmpty)
               Row(
-                spacing: 8,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
@@ -415,55 +379,30 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                     onPressed: _clearResults,
                     icon: const Icon(Icons.clear),
                     label: const Text('Clear'),
-                    style: TextButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
                   ),
                 ],
               ),
-            ],
 
-            // Discovered Bulbs List
+            const SizedBox(height: 8),
+
             Expanded(
               child: discoveredDevices.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.lightbulb_outline,
-                            size: 64,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No devices discovered',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
+                  ? _buildEmptyState()
                   : ListView.builder(
                       itemCount: discoveredDevices.length,
-                      itemBuilder: (context, index) {
+                      itemBuilder: (_, index) {
                         final device = discoveredDevices[index];
-                        final isAlreadyAdded = widget.visualizerProvider.devices
-                            .any(
-                              (existingDevice) =>
-                                  existingDevice.ip == device.ip,
-                            );
+                        final alreadyAdded = widget.visualizerProvider.devices
+                            .any((d) => d.ip == device.ip);
 
                         return Card(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ExpansionTile(
                             leading: CircleAvatar(
-                              backgroundColor: Theme.of(context).primaryColor,
-                              child: Icon(Icons.light),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                              child: const Icon(Icons.light),
                             ),
                             title: Text(
                               device.name ?? 'Unknown',
@@ -474,14 +413,8 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                             subtitle: Text('IP: ${device.ip}'),
                             children: [
                               Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 26.0,
-                                  right: 26,
-                                  top: 8,
-                                  bottom: 8,
-                                ),
+                                padding: const EdgeInsets.all(16),
                                 child: Column(
-                                  spacing: 4,
                                   children: [
                                     _buildDetailRow(
                                       'IP Address',
@@ -491,35 +424,25 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                                     _buildDetailRow(
                                       'Port',
                                       device.port.toString(),
-                                      Icons.settings_ethernet,
+                                      Icons.dns,
                                     ),
                                     _buildDetailRow(
                                       'MAC Address',
                                       device.mac ?? 'Unknown',
-                                      Icons.device_hub,
+                                      Icons.memory,
                                     ),
+                                    const SizedBox(height: 12),
                                     SizedBox(
                                       width: double.infinity,
                                       child: ElevatedButton(
-                                        onPressed: isAlreadyAdded
+                                        onPressed: alreadyAdded
                                             ? null
-                                            : () {
-                                                _showAddDeviceDialog(
-                                                  context,
-                                                  device,
-                                                );
-                                              },
-                                        style: ElevatedButton.styleFrom(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              4.0,
-                                            ),
-                                          ),
-                                        ),
+                                            : () =>
+                                                  _showAddDeviceDialog(device),
                                         child: Text(
-                                          isAlreadyAdded
-                                              ? 'Device already added'
-                                              : "Add Device",
+                                          alreadyAdded
+                                              ? 'Already added'
+                                              : 'Add Device',
                                         ),
                                       ),
                                     ),
@@ -538,36 +461,19 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        spacing: 12,
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 20, color: Colors.grey.shade600),
+          Icon(Icons.lightbulb_outline, size: 64, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
           Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-            ),
+            'No devices discovered',
+            style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
           ),
-          Expanded(child: Text(value)),
         ],
       ),
-    );
-  }
-
-  void _clearResults() {
-    setState(() {
-      discoveredDevices.clear();
-      errorMessage = null;
-    });
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
     );
   }
 }

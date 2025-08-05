@@ -133,7 +133,7 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
             NavigationDestination(
               selectedIcon: Icon(Icons.sync),
               icon: Icon(Icons.sync_outlined),
-              label: "Sync Config",
+              label: "Screen Sync",
             ),
           ],
         ),
@@ -145,10 +145,10 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
           return IndexedStack(
             index: selectedIndex,
             children: [
-              Home(visualizerProvider: provider),
-              EffectsPage(visualizerProvider: provider),
-              SimulatorPage(visualizerProvider: provider),
-              DisplaySyncConfigPage(visualizerProvider: provider),
+              Home(),
+              EffectsPage(),
+              SimulatorPage(),
+              DisplaySyncConfigPage(),
             ],
           );
         },
