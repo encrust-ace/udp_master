@@ -9,6 +9,7 @@ import 'package:udp_master/services/visualizer_provider.dart';
 
 // ignore: must_be_immutable
 class ScreenSelectDialog extends Dialog {
+  
   ScreenSelectDialog({super.key}) {
     Future.delayed(const Duration(milliseconds: 100), () {
       _getSources();
