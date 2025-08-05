@@ -734,14 +734,12 @@ class VisualizerProvider with ChangeNotifier {
     ) async {
       await _processFrameAndSend();
     });
-
     notifyListeners();
   }
 
   Future<void> stopScreenSync() async {
     _screenTimer?.cancel();
     _screenTimer = null;
-
     _isRunning = false;
     _screenStream?.dispose();
     _screenStream = null;
@@ -801,15 +799,6 @@ class VisualizerProvider with ChangeNotifier {
     }
   }
 
-  // Add this to your member variables at the top of the class
-  final Map<String, List<Color>> _previousColors = {};
-
-  final double smoothingFactor = 0.2;
-  final double saturationBoost = 1.3; // Boost saturation by 30%
-  final int darkThreshold =
-      20; // Pixels with R,G,B values below this are treated as black
-  final double gamma = 2.2; // A common gamma value for sRGB color space
-
   int getColorValue(Color color, String channel) {
     switch (channel) {
       case 'r':
@@ -832,57 +821,26 @@ class VisualizerProvider with ChangeNotifier {
     required int startIndex,
     required int endIndex,
   }) {
+    // Packet header
     final List<int> packet = [0x02, 0x04];
 
-    _previousColors[device.id] ??= List.generate(
-      device.ledCount,
-      (_) => const Color(0x00000000),
-    );
-
+    // A fixed thickness for the sampling area, e.g., 10% of the screen dimension
     final int sectionThickness =
         (side == DisplayPosition.left || side == DisplayPosition.right)
         ? (width * 0.1).round()
         : (height * 0.1).round();
 
-    // A helper function for gamma correction
-    int applyGamma(int value) {
-      // Normalize the value to a 0.0-1.0 range, apply gamma, then scale back to 0-255
-      double normalized = value / 255.0;
-      double corrected = pow(normalized, gamma) as double;
-      return (corrected * 255).round().clamp(0, 255);
-    }
+    // The number of LEDs on the current side
+    final int sideLedCount = (endIndex - startIndex) + 1;
 
-    // A helper function for saturation boost
-    Color applySaturationBoost(Color color) {
-      double r = double.parse(getColorValue(color, 'r').toString());
-      double g = double.parse(getColorValue(color, 'g').toString());
-      double b = double.parse(getColorValue(color, 'b').toString());
-      double l = 0.3 * r + 0.59 * g + 0.11 * b; // Calculate luminance
+    // We only need to process the LEDs for the current side
+    for (int i = 0; i < sideLedCount; i++) {
+      // Calculate the normalized position (t) along the edge
+      double t = i / (sideLedCount > 1 ? (sideLedCount - 1) : 1);
 
-      // Blend the color towards its luminance (gray) to increase saturation
-      r = l + saturationBoost * (r - l);
-      g = l + saturationBoost * (g - l);
-      b = l + saturationBoost * (b - l);
-
-      return Color.fromARGB(
-        255,
-        (r * 255).round().clamp(0, 255),
-        (g * 255).round().clamp(0, 255),
-        (b * 255).round().clamp(0, 255),
-      );
-    }
-
-    for (int i = 0; i < device.ledCount; i++) {
-      if (i < startIndex || i > endIndex) {
-        packet.addAll([0, 0, 0]);
-        continue;
-      }
-
-      double t =
-          (i - startIndex) /
-          ((endIndex - startIndex) > 0 ? (endIndex - startIndex) : 1);
       int x = 0, y = 0;
 
+      // Determine the sampling coordinates based on the display side
       switch (side) {
         case DisplayPosition.left:
           x = sectionThickness ~/ 2;
@@ -902,52 +860,20 @@ class VisualizerProvider with ChangeNotifier {
           break;
       }
 
+      // Calculate the pixel index in the raw RGBA data
       final int pixelIndex = (y * width + x) * 4;
 
+      // Ensure the pixel index is within the bounds of the pixel data
       if (pixelIndex >= 0 && pixelIndex + 3 < pixelData.length) {
-        final int newR = pixelData[pixelIndex];
-        final int newG = pixelData[pixelIndex + 1];
-        final int newB = pixelData[pixelIndex + 2];
+        final int r = pixelData[pixelIndex];
+        final int g = pixelData[pixelIndex + 1];
+        final int b = pixelData[pixelIndex + 2];
 
-        if (newR < darkThreshold &&
-            newG < darkThreshold &&
-            newB < darkThreshold) {
-          packet.addAll([0, 0, 0]);
-          _previousColors[device.id]![i] = const Color.fromARGB(255, 0, 0, 0);
-          continue;
-        }
-
-        Color newColor = Color.fromARGB(255, newR, newG, newB);
-
-        // Apply gamma correction to the sampled color
-        final int gammaR = applyGamma(getColorValue(newColor, 'r'));
-        final int gammaG = applyGamma(getColorValue(newColor, 'g'));
-        final int gammaB = applyGamma(getColorValue(newColor, 'b'));
-        newColor = Color.fromARGB(255, gammaR, gammaG, gammaB);
-
-        // Apply a simple saturation boost to the gamma-corrected color
-        Color boostedColor = applySaturationBoost(newColor);
-
-        final Color previousColor = _previousColors[device.id]![i];
-
-        final int r =
-            ((getColorValue(previousColor, 'r') * (1 - smoothingFactor)) +
-                    (getColorValue(boostedColor, 'r') * smoothingFactor))
-                .round();
-        final int g =
-            ((getColorValue(previousColor, 'g') * (1 - smoothingFactor)) +
-                    (getColorValue(boostedColor, 'g') * smoothingFactor))
-                .round();
-        final int b =
-            ((getColorValue(previousColor, 'b') * (1 - smoothingFactor)) +
-                    (getColorValue(boostedColor, 'b') * smoothingFactor))
-                .round();
-
+        // Add the raw RGB values to the packet
         packet.addAll([r, g, b]);
-        _previousColors[device.id]![i] = Color.fromARGB(255, r, g, b);
       } else {
+        // If the coordinates are out of bounds, send black
         packet.addAll([0, 0, 0]);
-        _previousColors[device.id]![i] = const Color.fromARGB(255, 0, 0, 0);
       }
     }
 

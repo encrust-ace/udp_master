@@ -316,7 +316,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
             ? true
             : {
                 'deviceId': {'exact': source.id},
-                'mandatory': {'frameRate': 30.0},
+                'mandatory': {'frameRate': 20.0},
               },
       };
 

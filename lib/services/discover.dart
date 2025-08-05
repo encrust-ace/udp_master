@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:bonsoir/bonsoir.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:udp_master/models.dart';
 import 'package:udp_master/screen/add_device.dart';
 import 'package:udp_master/services/visualizer_provider.dart';
@@ -34,8 +35,15 @@ class Device {
   final String ip;
   final int port;
   final String? mac;
+  final int ledCount;
 
-  Device({this.name, required this.ip, required this.port, this.mac});
+  Device({
+    this.name,
+    required this.ip,
+    required this.port,
+    this.mac,
+    required this.ledCount,
+  });
 }
 
 class BroadcastProtocol {
@@ -109,8 +117,6 @@ class BroadcastProtocol {
   }
 }
 
-// ... existing imports remain the same ...
-
 class DeviceScanPage extends StatefulWidget {
   final VisualizerProvider visualizerProvider;
 
@@ -181,6 +187,7 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
               ip: service.host!,
               port: deviceType.port,
               mac: service.attributes['mac'],
+              ledCount: 1,
             ),
           );
         }
@@ -199,7 +206,10 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
     final protocol = BroadcastProtocol(broadcastAddress, waitTime, deviceType);
     await protocol.broadcastRegistration();
     return protocol.discoveryBulbs
-        .map((d) => Device(ip: d.ip, port: deviceType.port, mac: d.mac))
+        .map(
+          (d) =>
+              Device(ip: d.ip, port: deviceType.port, mac: d.mac, ledCount: 1),
+        )
         .toList();
   }
 
@@ -231,6 +241,33 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
     }
   }
 
+  Future<Device?> _fetchWledDetails(Device device) async {
+    final String url = 'http://${device.ip}/json/info';
+
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+
+        if (data.containsKey('leds')) {
+          final int ledCount = data['leds']['count'];
+          final String? name = data['name'] ?? device.name;
+          return Device(
+            name: name,
+            ip: device.ip,
+            port: device.port,
+            mac: device.mac,
+            ledCount: ledCount,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to get WLED details for ${device.ip}: $e');
+    }
+
+    return null;
+  }
+
   void _showAddDeviceDialog(Device device) {
     showDialog(
       context: context,
@@ -242,7 +279,7 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
             name: device.name ?? 'Unknown',
             ip: device.ip,
             port: device.port,
-            ledCount: 0,
+            ledCount: device.ledCount,
             effect: '',
             isEffectEnabled: true,
             type: deviceType,
@@ -437,8 +474,28 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
                                       child: ElevatedButton(
                                         onPressed: alreadyAdded
                                             ? null
-                                            : () =>
-                                                  _showAddDeviceDialog(device),
+                                            : () async {
+                                                if (deviceType ==
+                                                    DeviceType.wled) {
+                                                  Device? newDevice =
+                                                      await _fetchWledDetails(
+                                                        device,
+                                                      );
+
+                                                  if (newDevice != null) {
+                                                    _showAddDeviceDialog(
+                                                      newDevice,
+                                                    );
+                                                  } else {
+                                                    _showAddDeviceDialog(
+                                                      device,
+                                                    );
+                                                  }
+                                                } else {
+                                                  _showAddDeviceDialog(device);
+                                                }
+                                              },
+
                                         child: Text(
                                           alreadyAdded
                                               ? 'Already added'
