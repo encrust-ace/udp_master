@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'package:udp_master/screen/effects.dart';
 import 'package:udp_master/screen/home.dart';
 import 'package:udp_master/screen/screen_sync_config.dart';
 import 'package:udp_master/screen/simulator_page.dart';
 import 'package:udp_master/screen/screen_capture.dart';
 import 'package:udp_master/services/discover.dart';
-
 import 'services/visualizer_provider.dart';
 
 void main() {
   runApp(
     ChangeNotifierProvider(
-      create: (context) => VisualizerProvider(),
+      create: (_) => VisualizerProvider(),
       child: const MyApp(),
     ),
   );
@@ -41,58 +41,55 @@ class VisualizerScreen extends StatefulWidget {
 }
 
 class _VisualizerScreenState extends State<VisualizerScreen> {
-  late VisualizerProvider _visualizerProvider;
-  bool _isInitialDependenciesMet = false;
-
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_isInitialDependenciesMet) {
-      _visualizerProvider = Provider.of<VisualizerProvider>(
-        context,
-        listen: true,
-      );
-      _visualizerProvider.initiateTheAppData();
-      _isInitialDependenciesMet = true;
-    }
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<VisualizerProvider>(context, listen: false);
+      provider.initiateTheAppData();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = Provider.of<VisualizerProvider>(context, listen: false);
+
     return Scaffold(
       appBar: AppBar(
         title: const Icon(Icons.lightbulb, size: 36),
         actions: [
           IconButton(
-            onPressed: () async => await _visualizerProvider.toggleVisualizer(),
-            icon: Icon(
-              _visualizerProvider.isRunning
-                  ? Icons.pause_circle
-                  : Icons.play_arrow_rounded,
-              size: 28,
+            onPressed: () async => await provider.toggleVisualizer(),
+            icon: Selector<VisualizerProvider, bool>(
+              selector: (_, p) => p.isRunning,
+              builder: (_, isRunning, __) => Icon(
+                isRunning ? Icons.pause_circle : Icons.play_arrow_rounded,
+                size: 28,
+              ),
+            ),
+          ),
+          Selector<VisualizerProvider, bool>(
+            selector: (_, p) => p.isRunning,
+            builder: (_, isRunning, __) => IconButton(
+              onPressed: isRunning
+                  ? null
+                  : () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ScreenCapturePage(),
+                        ),
+                      );
+                    },
+              icon: const Icon(Icons.video_call),
             ),
           ),
           IconButton(
-            onPressed: _visualizerProvider.isRunning
-                ? null
-                : () => {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ScreenCapturePage(),
-                      ),
-                    ),
-                  },
-            icon: const Icon(Icons.video_call),
-          ),
-          // Import/Export buttons
-          IconButton(
-            onPressed: () => _visualizerProvider.importDevicesFromJsonFile(),
+            onPressed: provider.importDevicesFromJsonFile,
             icon: const Icon(Icons.download),
           ),
           IconButton(
-            onPressed: () =>
-                _visualizerProvider.exportDevicesToJsonFile(context),
+            onPressed: () => provider.exportDevicesToJsonFile(context),
             icon: const Icon(Icons.upload),
           ),
           IconButton(
@@ -101,22 +98,21 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
-                      DeviceScanPage(visualizerProvider: _visualizerProvider),
+                      DeviceScanPage(visualizerProvider: provider),
                 ),
               );
             },
-            icon: Icon(Icons.search),
+            icon: const Icon(Icons.search),
           ),
-
           const SizedBox(width: 16),
         ],
       ),
       resizeToAvoidBottomInset: true,
 
-      // Bottom Navigation Bar
-      bottomNavigationBar: Consumer<VisualizerProvider>(
-        builder: (_, provider, __) => NavigationBar(
-          selectedIndex: provider.currentSelectedTab,
+      bottomNavigationBar: Selector<VisualizerProvider, int>(
+        selector: (_, p) => p.currentSelectedTab,
+        builder: (_, selectedIndex, __) => NavigationBar(
+          selectedIndex: selectedIndex,
           onDestinationSelected: provider.setCurrentSelectedTab,
           destinations: const [
             NavigationDestination(
@@ -143,17 +139,19 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
         ),
       ),
 
-      // Body using IndexedStack to avoid rebuilds
-      body: Consumer<VisualizerProvider>(
-        builder: (context, provider, _) => IndexedStack(
-          index: provider.currentSelectedTab,
-          children: [
-            Home(visualizerProvider: provider),
-            EffectsPage(visualizerProvider: provider),
-            SimulatorPage(visualizerProvider: provider),
-            DisplaySyncConfigPage(visualizerProvider: provider),
-          ],
-        ),
+      body: Selector<VisualizerProvider, int>(
+        selector: (_, p) => p.currentSelectedTab,
+        builder: (context, selectedIndex, _) {
+          return IndexedStack(
+            index: selectedIndex,
+            children: [
+              Home(visualizerProvider: provider),
+              EffectsPage(visualizerProvider: provider),
+              SimulatorPage(visualizerProvider: provider),
+              DisplaySyncConfigPage(visualizerProvider: provider),
+            ],
+          );
+        },
       ),
     );
   }
