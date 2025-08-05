@@ -1,9 +1,9 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:async';
-import 'dart:math';
 import 'dart:ui' as ui;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -20,57 +20,50 @@ import 'package:udp_master/models.dart';
 import 'package:udp_master/services/audio_analyzer.dart';
 import 'package:udp_master/services/udp_sender.dart';
 
-typedef EffectRenderFunction =
-    List<int> Function({
-      required int ledCount,
-      required Float32List fft,
-      double gain,
-      // required double hue,
-    });
-
+// Method and Event channels for platform-specific communication
 const MethodChannel _platform = MethodChannel("mic_channel");
 const EventChannel _micStreamChannel = EventChannel('mic_stream');
 
 class VisualizerProvider with ChangeNotifier {
+  // Singleton instance
   static final VisualizerProvider _instance = VisualizerProvider._internal();
-  final UdpSender _udpSender = UdpSender();
 
-  factory VisualizerProvider() {
-    return _instance;
-  }
+  factory VisualizerProvider() => _instance;
 
   VisualizerProvider._internal();
 
+  // --- Core Services & State ---
+  final UdpSender _udpSender = UdpSender();
   final Recorder _recorder = Recorder.instance;
-  // For Linux
+  final AudioAnalyzer _audioAnalyzer = AudioAnalyzer(
+    sampleRate: 44100,
+    fftSize: 1024,
+  );
 
   bool _isRunning = false;
   bool get isRunning => _isRunning;
 
-  // Packets for internal simulation/debugging display, not for driving hardware directly.
-  // This variable's update is decoupled from the main UDP send loop for performance.
-  List<int> packets = [];
-
   int _currentSelectedTab = 0;
   int get currentSelectedTab => _currentSelectedTab;
 
-  Future<void> setCurrentSelectedTab(int value) async {
-    _currentSelectedTab = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('currentSelectedTab', value);
-    notifyListeners();
-  }
-
+  List<int> packets = []; // For internal simulation/debugging display
   StreamSubscription? _micSubscription;
-  List<DisplaySide> _displaySides = [];
+
+  // --- Device & Display Side Management ---
   List<LedDevice> _devices = [];
   UnmodifiableListView<LedDevice> get devices => UnmodifiableListView(_devices);
 
-  // --- Effect Management ---
+  List<DisplaySide> _displaySides = [];
+  UnmodifiableListView<DisplaySide> get displaySides =>
+      UnmodifiableListView(_displaySides);
 
-  // Updated effects list with new advanced effects
-  List<LedEffect> _effects = [
-    LedEffect(
+  // --- Effect Management ---
+  String _globalEffectId = 'vertical-bars';
+  String get globalEffectId => _globalEffectId;
+
+  // Using a map for faster effect lookup by ID
+  final Map<String, LedEffect> _effects = {
+    'vertical-bars': LedEffect(
       id: 'vertical-bars',
       name: 'Vertical Bars',
       parameters: {
@@ -97,7 +90,7 @@ class VisualizerProvider with ChangeNotifier {
         },
       },
     ),
-    LedEffect(
+    'center-pulse': LedEffect(
       id: 'center-pulse',
       name: 'Center Pulse',
       parameters: {
@@ -124,7 +117,7 @@ class VisualizerProvider with ChangeNotifier {
         },
       },
     ),
-    LedEffect(
+    'music-rhythm': LedEffect(
       id: 'music-rhythm',
       name: 'Music Rhythm',
       parameters: {
@@ -154,7 +147,7 @@ class VisualizerProvider with ChangeNotifier {
           'max': 30.0,
           'value': 10,
           'steps': 10,
-          'default': 10,
+          'default': 10.0,
         },
         'decaySpeed': {
           'min': 0.3,
@@ -172,38 +165,42 @@ class VisualizerProvider with ChangeNotifier {
         },
       },
     ),
-  ];
+  };
 
-  String _globalEffectId = 'vertical-bars';
+  UnmodifiableListView<LedEffect> get effects =>
+      UnmodifiableListView(_effects.values.toList());
 
-  String get globalEffectId => _globalEffectId;
+  LedEffect getEffectById(String id) => _effects[id] ?? _effects.values.first;
 
-  UnmodifiableListView<LedEffect> get effects => UnmodifiableListView(_effects);
+  // --- Screen Sync Properties ---
+  GlobalKey? _videoKey;
+  MediaStream? _screenStream;
+  Timer? _screenTimer;
 
-  LedEffect getEffectById(String id) {
-    try {
-      return _effects.firstWhere(
-        (effect) => effect.id == id,
-        orElse: () => _effects.first,
-      );
-    } catch (_) {
-      // Should ideally not happen if _effects is never empty and first is valid
-      return _effects.first;
-    }
+  // ----------------------------------------------------------------------
+  // --- Public Methods ---
+  // ----------------------------------------------------------------------
+
+  Future<void> initiateTheAppData() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Restore data from SharedPreferences
+    await _restoreDevices(prefs);
+    await _restoreEffects(prefs);
+    await _restoreDisplaySides(prefs);
+
+    _currentSelectedTab = prefs.getInt('currentSelectedTab') ?? 0;
+    _globalEffectId = prefs.getString('globalEffect') ?? _effects.keys.first;
+
+    // Initialize UDP sender
+    _udpSender.initiateUDPSender();
+    notifyListeners();
   }
 
-  Future<bool> resetEffect(LedEffect effect) async {
-    int index = _effects.indexWhere((e) => e.id == effect.id);
-    if (index == -1) {
-      return false;
-    }
-    effect.parameters.forEach((key, value) {
-      value["value"] = value["default"];
-    });
-    _effects[index] = effect;
+  Future<bool> setCurrentSelectedTab(int value) async {
+    _currentSelectedTab = value;
     final prefs = await SharedPreferences.getInstance();
-    final effectList = _effects.map((e) => json.encode(e.toJson())).toList();
-    await prefs.setStringList('effects', effectList);
+    await prefs.setInt('currentSelectedTab', value);
     notifyListeners();
     return true;
   }
@@ -211,359 +208,155 @@ class VisualizerProvider with ChangeNotifier {
   Future<bool> setGlobalEffect(String effectId) async {
     _globalEffectId = effectId;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('globalEffect', json.encode(effectId));
+    await prefs.setString('globalEffect', effectId);
+
+    // Update all devices to use the new global effect
     final updatedDevices = _devices
         .map((d) => d.copyWith(effect: effectId))
         .toList();
+    _devices = updatedDevices;
+    await _saveDevices();
 
-    for (var device in updatedDevices) {
-      deviceActions(device, DeviceAction.update);
-    }
     notifyListeners();
     return true;
   }
 
-  Future<bool> updateEffect(
-    LedEffect effect,
-    String key,
-    Map<String, dynamic> parameter,
-  ) async {
-    List<LedEffect> existingEffects = _effects;
-    int index = existingEffects.indexWhere((e) => e.id == effect.id);
-    if (index == -1) {
-      return false;
-    }
-    existingEffects[index] = effect.copyWith(
-      parameters: {...effect.parameters, key: parameter},
-    );
-    final prefs = await SharedPreferences.getInstance();
-    final effectList = existingEffects
-        .map((e) => json.encode(e.toJson()))
-        .toList();
-    await prefs.setStringList('effects', effectList);
-    _effects = existingEffects;
+  Future<void> toggleVisualizer() async {
+    _isRunning ? await _stopVisualizer() : await _startVisualizer();
+  }
+
+  Future<bool> startScreenSync(MediaStream stream, GlobalKey key) async {
+    if (_isRunning) return false;
+    _screenStream = stream;
+    _videoKey = key;
+    _isRunning = true;
+    _screenTimer?.cancel();
+    _screenTimer = Timer.periodic(const Duration(milliseconds: 50), (_) async {
+      await _processFrameAndSend();
+    });
     notifyListeners();
     return true;
   }
 
-  // Enhanced UDP sending function
-  Future<void> sendUdpToDevices({
-    required List<LedDevice> targetDevices,
-    required AudioFeatures features,
-  }) async {
-    if (_udpSender.udpSocket == null) {
-      if (kDebugMode) {
-        print("VisualizerService: UDP sender not initialized.");
-      }
-      return;
-    }
-
-    for (var device in targetDevices) {
-      try {
-        if (device.type == DeviceType.wled ||
-            device.type == DeviceType.esphome) {
-          LedEffect effect = getEffectById(device.effect);
-          late List<int> packetData;
-
-          // Use enhanced effects for new effect types
-          if (effect.id == 'vertical-bars') {
-            packetData = renderVerticalBars(
-              device: device,
-              features: features,
-              gain: effect.parameters["gain"]?["value"] ?? 0.0,
-              brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-              saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-            );
-          } else if (effect.id == 'center-pulse') {
-            packetData = renderCenterPulsePacket(
-              device: device,
-              features: features,
-              gain: effect.parameters["gain"]?["value"] ?? 0.0,
-              brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-              saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-            );
-          } else if (effect.id == 'music-rhythm') {
-            packetData = renderBeatDropEffect(
-              device: device,
-              features: features,
-              gain: effect.parameters["gain"]?["value"] ?? 0.0,
-              brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-              saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-              raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 12.5,
-              decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 0.5,
-              dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
-            );
-          }
-
-          if (packetData.isNotEmpty) {
-            _udpSender.send(device, packetData);
-          }
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print("Error sending to ${device.ip}: $e");
-        }
-      }
-    }
-  }
-
-  // Enhanced simulator page data
-  Future<void> simulatorPageDataEnhanced(
-    AudioFeatures features,
-    LedEffect effect,
-  ) async {
-    late List<int> packetData;
-    LedDevice simulatedDevice = LedDevice(
-      id: 'Simulator',
-      name: 'Simulator',
-      ip: '127.0.0.1',
-      port: 60,
-      ledCount: 90,
-      effect: effect.id,
-      isEffectEnabled: true,
-      type: DeviceType.wled,
-    );
-
-    // Use enhanced effects for new effect types
-    if (effect.id == 'vertical-bars') {
-      packetData = renderVerticalBars(
-        device: simulatedDevice,
-        features: features,
-        gain: effect.parameters["gain"]?["value"] ?? 0.0,
-        brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-        saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-      );
-    } else if (effect.id == 'center-pulse') {
-      packetData = renderCenterPulsePacket(
-        device: simulatedDevice,
-        features: features,
-        gain: effect.parameters["gain"]?["value"] ?? 0.0,
-        brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-        saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-      );
-    } else if (effect.id == 'music-rhythm') {
-      packetData = renderBeatDropEffect(
-        device: simulatedDevice,
-        features: features,
-        gain: effect.parameters["gain"]?["value"] ?? 0.0,
-        brightness: effect.parameters["brightness"]?["value"] ?? 1.0,
-        saturation: effect.parameters["saturation"]?["value"] ?? 1.0,
-        raiseSpeed: effect.parameters["raiseSpeed"]?["value"] ?? 12.5,
-        decaySpeed: effect.parameters["decaySpeed"]?["value"] ?? 0.5,
-        dropSpeed: effect.parameters["dropSpeed"]?["value"] ?? 0.5,
-      );
-    }
-
-    if (packetData.isNotEmpty) {
-      packets = packetData;
-      notifyListeners();
-    }
-  }
-  // --- Device Management ---
-
-  Future<void> initiateTheAppData() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // restore devices
-    final deviceList = prefs.getStringList('devices') ?? [];
-    _devices = deviceList
-        .map((e) => LedDevice.fromJson(json.decode(e)))
-        .toList();
-
-    // restore last selected tab
-    final currectSelectedTab = prefs.getInt('currentSelectedTab') ?? 0;
-    _currentSelectedTab = currectSelectedTab;
-
-    // restore effects presets
-    final effectList = prefs.getStringList('effects') ?? [];
-    List<LedEffect> fetchedEffects = effectList
-        .map((e) => LedEffect.fromJson(json.decode(e)))
-        .toList();
-    for (var effect in fetchedEffects) {
-      int index = _effects.indexWhere((e) => e.id == effect.id);
-      if (index != -1) {
-        _effects[index] = effect;
-      }
-    }
-
-    // restore global effect
-    final globalEffectId = prefs.getString('globalEffect');
-    if (globalEffectId != null) {
-      _globalEffectId = globalEffectId;
-    }
-
-    // restore display sides
-    final displaySideList = prefs.getStringList('displaySides') ?? [];
-    _displaySides = displaySideList
-        .map((e) => DisplaySide.fromJson(json.decode(e)))
-        .toList();
-
-    // initialize udp
-    _udpSender.initiateUDPSender();
+  Future<void> stopScreenSync() async {
+    if (!_isRunning) return;
+    _screenTimer?.cancel();
+    _screenTimer = null;
+    _isRunning = false;
+    await _screenStream?.dispose();
+    _screenStream = null;
     notifyListeners();
   }
 
-  Future<void> _saveDevices() async {
-    final prefs = await SharedPreferences.getInstance();
-    final deviceList = _devices
-        .map((device) => json.encode(device.toJson()))
-        .toList();
-    await prefs.setStringList('devices', deviceList);
-    notifyListeners(); // Only notify when device list actually changes
-  }
-
+  // --- Device Actions ---
   Future<String> deviceActions(LedDevice device, DeviceAction action) async {
     try {
       switch (action) {
         case DeviceAction.add:
-          // Check for duplicate (by name or IP)
-          final int index = _devices.indexWhere((d) => d.ip == device.ip);
-          if (index != -1) {
-            _devices[index] = device;
-            return "Device already exists";
-          } else {
+          if (!_devices.any((d) => d.id == device.id)) {
             _devices.add(device);
-            await _saveDevices();
-            return "Device added successfully";
+          } else {
+            return "Device already exists";
           }
+          break;
         case DeviceAction.update:
-          final int index = _devices.indexWhere((d) => d.id == device.id);
+          final index = _devices.indexWhere((d) => d.id == device.id);
           if (index != -1) {
             _devices[index] = device;
-            await _saveDevices();
-            return "Device updated successfully";
           } else {
             return "Device not found, cannot update";
           }
+          break;
         case DeviceAction.delete:
           _devices.removeWhere((d) => d.id == device.id);
-          await _saveDevices();
-          return "Device deleted successfully";
+          break;
       }
+      await _saveDevices();
+      return "Action successful";
     } catch (e) {
       return "Error: $e";
     }
   }
 
-  // Export saved devices
   Future<File?> exportDevicesToJsonFile(BuildContext context) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final deviceList = prefs.getStringList('devices') ?? [];
-
-      if (deviceList.isEmpty) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No devices to export.'),
-              backgroundColor: Colors.orangeAccent,
-            ),
-          );
-        }
-        return null;
-      }
-
-      final decodedDevices = deviceList.map((e) => json.decode(e)).toList();
-      final jsonString = jsonEncode(decodedDevices);
-      final jsonBytes = utf8.encode(jsonString);
-
-      final outputPath = await FilePicker.platform.saveFile(
-        fileName: 'devices.json',
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-        bytes: jsonBytes,
-      );
-
-      if (outputPath == null) {
-        return null; // User canceled
-      }
-
-      // Only needed if you're on desktop and want to write again manually
-      final file = File(outputPath);
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        await file.writeAsBytes(
-          jsonBytes,
-        ); // optional — bytes were already written
-      }
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Devices exported successfully!')),
-        );
-      }
-
-      return file;
-    } catch (e) {
-      if (kDebugMode) {
-        print("VisualizerService: Failed to export devices to JSON: $e");
-      }
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to export devices: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-      return null;
-    }
+    // Simplified logic, using a helper function to avoid code duplication
+    return _exportDataToJsonFile(
+      context,
+      'devices',
+      'devices.json',
+      (e) => LedDevice.fromJson(json.decode(e)),
+    );
   }
 
   Future<String> importDevicesFromJsonFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      dialogTitle: "Select Devices JSON File",
-      type: FileType.custom,
-      allowedExtensions: ['json'],
-      withData: true, // Read file content into memory
-    );
-
-    if (result == null ||
-        result.files.isEmpty ||
-        result.files.single.bytes == null) {
-      return "File selection canceled or no data found.";
-    } else {
-      final bytes = result.files.single.bytes!;
-      final jsonString = utf8.decode(bytes);
-      final List<dynamic> decodedList = jsonDecode(
-        jsonString,
-      ); // This is List<dynamic>
-      final List<LedDevice> importedDevices = decodedList
-          .map((e) => LedDevice.fromJson(e))
-          .toList();
-
-      final List<LedDevice> finalList = _devices;
-      for (var device in importedDevices) {
-        final existingIndex = _devices.indexWhere((d) => d.ip == device.ip);
-        if (existingIndex != -1) {
-          // Update existing device
-          _devices[existingIndex] = device;
-        } else {
-          // Add new device
-          finalList.add(device);
+    // Simplified logic, using a helper function
+    return _importDataFromJsonFile<LedDevice>(
+      'devices',
+      (e) => LedDevice.fromJson(e),
+      (importedDevices) {
+        final existingIps = _devices.map((d) => d.ip).toSet();
+        for (var device in importedDevices) {
+          if (!existingIps.contains(device.ip)) {
+            _devices.add(device);
+          }
         }
-      }
-      await _saveDevices();
-      return "Devices imported successfully!";
+      },
+    );
+  }
+
+  // --- Effect Actions ---
+  Future<bool> updateEffect(
+    LedEffect effect,
+    String key,
+    Map<String, dynamic> parameter,
+  ) async {
+    final updatedEffect = effect.copyWith(
+      parameters: {...effect.parameters, key: parameter},
+    );
+    _effects[effect.id] = updatedEffect;
+    await _saveEffects();
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> resetEffect(LedEffect effect) async {
+    final defaultEffect = _effects[effect.id]!.copyWith(
+      parameters: Map.fromEntries(
+        effect.parameters.entries.map(
+          (e) => MapEntry(e.key, {...e.value, 'value': e.value['default']}),
+        ),
+      ),
+    );
+    _effects[effect.id] = defaultEffect;
+    await _saveEffects();
+    notifyListeners();
+    return true;
+  }
+
+  // --- Display Side Actions ---
+  Future<bool> addOrUpdateDisplaySide(DisplaySide side) async {
+    final index = _displaySides.indexWhere((s) => s.position == side.position);
+    if (index != -1) {
+      _displaySides[index] = side;
+    } else {
+      _displaySides.add(side);
     }
+    await _saveDisplaySides();
+    notifyListeners();
+    return true;
   }
 
-  // --- End Device Management ---
+  // ----------------------------------------------------------------------
+  // --- Private Methods ---
+  // ----------------------------------------------------------------------
 
-  Future<bool> _ensureMicPermission() async {
-    if (!Platform.isAndroid && !Platform.isIOS) return true;
-    var status = await Permission.microphone.status;
-    if (!status.isGranted) status = await Permission.microphone.request();
-    return status.isGranted;
-  }
+  // --- Visualizer Core Logic ---
 
-  Future<bool> startVisualizer() async {
+  Future<bool> _startVisualizer() async {
     if (_isRunning) return true;
-
-    bool granted = await _ensureMicPermission();
-    if (!granted) {
-      if (kDebugMode) {
+    if (!await _ensureMicPermission()) {
+      if (kDebugMode)
         print("VisualizerService: Microphone permission not granted.");
-      }
       return false;
     }
 
@@ -579,6 +372,7 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   Future<void> _stopVisualizer() async {
+    if (!_isRunning) return;
     if (Platform.isLinux) {
       _recorder.stopStreamingData();
       _recorder.deinit();
@@ -591,62 +385,22 @@ class VisualizerProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> toggleVisualizer() async {
-    if (_isRunning) {
-      await _stopVisualizer();
-    } else {
-      await startVisualizer();
-    }
-  }
-
   Future<void> _startMicAndroid() async {
     await _platform.invokeMethod("startMic");
-
-    final AudioAnalyzer analyzer = AudioAnalyzer(
-      sampleRate: 44100,
-      fftSize: 1024,
-    );
-
     _micSubscription = _micStreamChannel.receiveBroadcastStream().listen(
       (samples) {
         if (!_isRunning || _devices.isEmpty) return;
-
-        List<double> doubleSamples;
-        if (samples is List<dynamic>) {
-          doubleSamples = samples.map((s) => (s as num).toDouble()).toList();
-        } else {
-          if (kDebugMode) {
-            print(
-              "VisualizerService: Unexpected sample type: ${samples.runtimeType}",
-            );
-          }
-          return;
-        }
-
-        final Float32List floatSamples = Float32List.fromList(doubleSamples);
-
-        // Use analyzer to extract FFT and volume features
-        final AudioFeatures features = analyzer.analyze(floatSamples);
-
-        // Send to devices
-        sendUdpToDevices(
-          targetDevices: _devices
-              .where((d) => d.isEffectEnabled == true)
-              .toList(),
-          features: features,
+        final floatSamples = Float32List.fromList(
+          (samples as List).map((s) => (s as num).toDouble()).toList(),
         );
-
-        // Update simulator view if on tab 2
-        if (_currentSelectedTab == 2) {
-          simulatorPageDataEnhanced(features, getEffectById(_globalEffectId));
-        }
+        _processAudioData(_audioAnalyzer.analyze(floatSamples));
       },
-      onError: (error) {
-        if (kDebugMode) print("VisualizerService: Mic stream error: $error");
+      onError: (e) {
+        if (kDebugMode) print("Mic stream error: $e");
         _stopVisualizer();
       },
       onDone: () {
-        if (kDebugMode) print("VisualizerService: Mic stream done.");
+        if (kDebugMode) print("Mic stream done.");
         if (_isRunning) _stopVisualizer();
       },
     );
@@ -659,121 +413,144 @@ class VisualizerProvider with ChangeNotifier {
         sampleRate: 44100,
         channels: RecorderChannels.mono,
       );
-
-      // Enhanced settings for better FFT quality
-      _recorder.setFftSmoothing(0.05); // Less smoothing for more responsiveness
-      // _recorder.setFftSize(2048); // Larger FFT for better frequency resolution
-
+      _recorder.setFftSmoothing(0.05);
       _recorder.start();
       _recorder.startStreamingData();
-
-      final AudioAnalyzer analyzer = AudioAnalyzer(
-        sampleRate: 44100,
-        fftSize: 1024,
-      );
-
       _micSubscription = _recorder.uint8ListStream.listen((_) {
         if (!_isRunning || _devices.isEmpty) return;
-
-        final Float32List fft = _recorder.getFft();
-
-        final features = analyzer.analyze(fft);
-
-        // Use enhanced audio processing
-        sendUdpToDevices(
-          targetDevices: _devices.where((d) => d.isEffectEnabled).toList(),
-          features: features,
-        );
-
-        if (_currentSelectedTab == 2) {
-          simulatorPageDataEnhanced(features, getEffectById(_globalEffectId));
-        }
+        _processAudioData(_audioAnalyzer.analyze(_recorder.getFft()));
       });
     } catch (e) {
-      if (kDebugMode) {
-        print("VisualizerService (Linux): Error starting mic: $e");
+      if (kDebugMode) print("Linux mic error: $e");
+    }
+  }
+
+  void _processAudioData(AudioFeatures features) {
+    // Filter out only active devices once to avoid re-filtering in the loop
+    final activeDevices = _devices.where((d) => d.isEffectEnabled).toList();
+
+    for (final device in activeDevices) {
+      final effect = _effects[device.effect]!;
+      List<int> packetData = [];
+
+      switch (effect.id) {
+        case 'vertical-bars':
+          packetData = renderVerticalBars(
+            device: device,
+            features: features,
+            gain: effect.parameters["gain"]!['value'],
+            brightness: effect.parameters["brightness"]!['value'],
+            saturation: effect.parameters["saturation"]!['value'],
+          );
+          break;
+        case 'center-pulse':
+          packetData = renderCenterPulsePacket(
+            device: device,
+            features: features,
+            gain: effect.parameters["gain"]!['value'],
+            brightness: effect.parameters["brightness"]!['value'],
+            saturation: effect.parameters["saturation"]!['value'],
+          );
+          break;
+        case 'music-rhythm':
+          packetData = renderBeatDropEffect(
+            device: device,
+            features: features,
+            gain: effect.parameters["gain"]!['value'],
+            brightness: effect.parameters["brightness"]!['value'],
+            saturation: effect.parameters["saturation"]!['value'],
+            raiseSpeed: effect.parameters["raiseSpeed"]!['value'],
+            decaySpeed: effect.parameters["decaySpeed"]!['value'],
+            dropSpeed: effect.parameters["dropSpeed"]!['value'],
+          );
+          break;
+      }
+      if (packetData.isNotEmpty) {
+        _udpSender.send(device, packetData);
       }
     }
-  }
 
-  // --- Screen Sync Methods ---
-  GlobalKey? _videoKey;
-  MediaStream? _screenStream;
-  Timer? _screenTimer;
-
-  UnmodifiableListView<DisplaySide> get displaySides =>
-      UnmodifiableListView(_displaySides);
-
-  Future<bool> addOrUpdateDisplaySide(DisplaySide side) async {
-    // Check if the side already exists
-    int index = _displaySides.indexWhere((s) => s.position == side.position);
-    if (index != -1) {
-      // Update existing side
-      _displaySides[index] = side;
-    } else {
-      // Add new side
-      _displaySides.add(side);
+    if (_currentSelectedTab == 2) {
+      _updateSimulatorData(features, _effects[_globalEffectId]!);
     }
-    final prefs = await SharedPreferences.getInstance();
-    final sideList = _displaySides.map((s) => json.encode(s.toJson())).toList();
-    await prefs.setStringList('displaySides', sideList);
-    notifyListeners();
-    return true;
   }
 
-  Future<void> startScreenSync(MediaStream stream, GlobalKey key) async {
-    _screenStream = stream;
-    _videoKey = key;
-    _isRunning = true;
+  void _updateSimulatorData(AudioFeatures features, LedEffect effect) {
+    // This is a simplified version of the main processing loop for a single device
+    LedDevice simulatedDevice = LedDevice(
+      id: 'Simulator',
+      name: 'Simulator',
+      ip: '127.0.0.1',
+      port: 60,
+      ledCount: 90,
+      effect: effect.id,
+      isEffectEnabled: true,
+      type: DeviceType.wled,
+    );
 
-    _screenTimer?.cancel();
+    List<int> packetData = [];
 
-    // Set up a periodic timer to process the stream at ~20 FPS (50ms)
-    _screenTimer = Timer.periodic(const Duration(milliseconds: 50), (
-      timer,
-    ) async {
-      await _processFrameAndSend();
-    });
-    notifyListeners();
+    switch (effect.id) {
+      case 'vertical-bars':
+        packetData = renderVerticalBars(
+          device: simulatedDevice,
+          features: features,
+          gain: effect.parameters["gain"]!['value'],
+          brightness: effect.parameters["brightness"]!['value'],
+          saturation: effect.parameters["saturation"]!['value'],
+        );
+        break;
+      case 'center-pulse':
+        packetData = renderCenterPulsePacket(
+          device: simulatedDevice,
+          features: features,
+          gain: effect.parameters["gain"]!['value'],
+          brightness: effect.parameters["brightness"]!['value'],
+          saturation: effect.parameters["saturation"]!['value'],
+        );
+        break;
+      case 'music-rhythm':
+        packetData = renderBeatDropEffect(
+          device: simulatedDevice,
+          features: features,
+          gain: effect.parameters["gain"]!['value'],
+          brightness: effect.parameters["brightness"]!['value'],
+          saturation: effect.parameters["saturation"]!['value'],
+          raiseSpeed: effect.parameters["raiseSpeed"]!['value'],
+          decaySpeed: effect.parameters["decaySpeed"]!['value'],
+          dropSpeed: effect.parameters["dropSpeed"]!['value'],
+        );
+        break;
+    }
+
+    if (packetData.isNotEmpty) {
+      packets = packetData;
+      notifyListeners();
+    }
   }
 
-  Future<void> stopScreenSync() async {
-    _screenTimer?.cancel();
-    _screenTimer = null;
-    _isRunning = false;
-    _screenStream?.dispose();
-    _screenStream = null;
-    notifyListeners();
-  }
+  // --- Screen Sync Logic ---
 
   Future<void> _processFrameAndSend() async {
-    // Check if the key and displaySides are valid
-    if (_videoKey == null ||
-        _videoKey!.currentContext == null ||
-        _displaySides.isEmpty) {
-      return;
-    }
+    if (_videoKey?.currentContext == null || _displaySides.isEmpty) return;
 
     try {
-      RenderRepaintBoundary boundary =
+      final boundary =
           _videoKey!.currentContext!.findRenderObject()
               as RenderRepaintBoundary;
-
-      ui.Image image = await boundary.toImage();
-      ByteData? byteData = await image.toByteData(
+      final image = await boundary.toImage();
+      final byteData = await image.toByteData(
         format: ui.ImageByteFormat.rawRgba,
       );
-
       if (byteData == null) return;
 
-      Uint8List pixelData = byteData.buffer.asUint8List();
-      final int width = image.width;
-      final int height = image.height;
+      final pixelData = byteData.buffer.asUint8List();
+      final width = image.width;
+      final height = image.height;
 
-      // Iterate through all configured display sides
+      // Process and send data for all sides in a single loop
       for (final side in _displaySides) {
         final device = side.device;
-
         if (device == null) continue;
 
         final packetData = _renderScreenData(
@@ -785,30 +562,13 @@ class VisualizerProvider with ChangeNotifier {
           startIndex: side.startIndex,
           endIndex: side.endIndex,
         );
-
         if (packetData.isNotEmpty) {
           _udpSender.send(device, packetData);
         }
       }
-
       image.dispose();
     } catch (e) {
-      if (kDebugMode) {
-        print("Error processing frame: $e");
-      }
-    }
-  }
-
-  int getColorValue(Color color, String channel) {
-    switch (channel) {
-      case 'r':
-        return ((color.r * 255.0).round() & 0xff);
-      case 'g':
-        return ((color.g * 255.0).round() & 0xff);
-      case 'b':
-        return ((color.b * 255.0).round() & 0xff);
-      default:
-        return ((color.r * 255.0).round() & 0xff);
+      if (kDebugMode) print("Error processing frame: $e");
     }
   }
 
@@ -821,26 +581,21 @@ class VisualizerProvider with ChangeNotifier {
     required int startIndex,
     required int endIndex,
   }) {
-    // Packet header
     final List<int> packet = [0x02, 0x04];
+    final int sideLedCount = endIndex - startIndex + 1;
+    if (sideLedCount <= 0) return [];
 
-    // A fixed thickness for the sampling area, e.g., 10% of the screen dimension
+    // Pre-calculate constants outside the loop
     final int sectionThickness =
         (side == DisplayPosition.left || side == DisplayPosition.right)
         ? (width * 0.1).round()
         : (height * 0.1).round();
+    final double step = 1.0 / (sideLedCount > 1 ? (sideLedCount - 1) : 1);
 
-    // The number of LEDs on the current side
-    final int sideLedCount = (endIndex - startIndex) + 1;
-
-    // We only need to process the LEDs for the current side
     for (int i = 0; i < sideLedCount; i++) {
-      // Calculate the normalized position (t) along the edge
-      double t = i / (sideLedCount > 1 ? (sideLedCount - 1) : 1);
+      double t = i * step;
+      int x, y;
 
-      int x = 0, y = 0;
-
-      // Determine the sampling coordinates based on the display side
       switch (side) {
         case DisplayPosition.left:
           x = sectionThickness ~/ 2;
@@ -860,23 +615,149 @@ class VisualizerProvider with ChangeNotifier {
           break;
       }
 
-      // Calculate the pixel index in the raw RGBA data
       final int pixelIndex = (y * width + x) * 4;
 
-      // Ensure the pixel index is within the bounds of the pixel data
       if (pixelIndex >= 0 && pixelIndex + 3 < pixelData.length) {
-        final int r = pixelData[pixelIndex];
-        final int g = pixelData[pixelIndex + 1];
-        final int b = pixelData[pixelIndex + 2];
-
-        // Add the raw RGB values to the packet
-        packet.addAll([r, g, b]);
+        packet.addAll([
+          pixelData[pixelIndex],
+          pixelData[pixelIndex + 1],
+          pixelData[pixelIndex + 2],
+        ]);
       } else {
-        // If the coordinates are out of bounds, send black
         packet.addAll([0, 0, 0]);
       }
     }
-
     return packet;
+  }
+
+  // --- Persistence & Permissions ---
+
+  Future<void> _saveDevices() async {
+    final prefs = await SharedPreferences.getInstance();
+    final deviceList = _devices.map((d) => json.encode(d.toJson())).toList();
+    await prefs.setStringList('devices', deviceList);
+    notifyListeners();
+  }
+
+  Future<void> _saveEffects() async {
+    final prefs = await SharedPreferences.getInstance();
+    final effectList = _effects.values
+        .map((e) => json.encode(e.toJson()))
+        .toList();
+    await prefs.setStringList('effects', effectList);
+    notifyListeners();
+  }
+
+  Future<void> _saveDisplaySides() async {
+    final prefs = await SharedPreferences.getInstance();
+    final sideList = _displaySides.map((s) => json.encode(s.toJson())).toList();
+    await prefs.setStringList('displaySides', sideList);
+    notifyListeners();
+  }
+
+  Future<void> _restoreDevices(SharedPreferences prefs) async {
+    final deviceList = prefs.getStringList('devices') ?? [];
+    _devices = deviceList
+        .map((e) => LedDevice.fromJson(json.decode(e)))
+        .toList();
+  }
+
+  Future<void> _restoreEffects(SharedPreferences prefs) async {
+    final effectList = prefs.getStringList('effects') ?? [];
+    for (var effectJson in effectList) {
+      final effect = LedEffect.fromJson(json.decode(effectJson));
+      if (_effects.containsKey(effect.id)) {
+        _effects[effect.id] = effect;
+      }
+    }
+  }
+
+  Future<void> _restoreDisplaySides(SharedPreferences prefs) async {
+    final displaySideList = prefs.getStringList('displaySides') ?? [];
+    _displaySides = displaySideList
+        .map((e) => DisplaySide.fromJson(json.decode(e)))
+        .toList();
+  }
+
+  Future<bool> _ensureMicPermission() async {
+    if (!Platform.isAndroid && !Platform.isIOS) return true;
+    final status = await Permission.microphone.request();
+    return status.isGranted;
+  }
+
+  // --- Reusable Helper Functions ---
+
+  Future<File?> _exportDataToJsonFile(
+    BuildContext context,
+    String key,
+    String filename,
+    Function fromJson,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dataList = prefs.getStringList(key) ?? [];
+      if (dataList.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('No $key to export.'),
+              backgroundColor: Colors.orangeAccent,
+            ),
+          );
+        }
+        return null;
+      }
+      final decodedData = dataList.map((e) => json.decode(e)).toList();
+      final jsonString = jsonEncode(decodedData);
+      final jsonBytes = utf8.encode(jsonString);
+      final outputPath = await FilePicker.platform.saveFile(
+        fileName: filename,
+        bytes: jsonBytes,
+      );
+      if (outputPath == null) return null;
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$key exported successfully!')));
+      }
+      return File(outputPath);
+    } catch (e) {
+      if (kDebugMode) print("Failed to export $key to JSON: $e");
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to export $key: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+      return null;
+    }
+  }
+
+  Future<String> _importDataFromJsonFile<T>(
+    String key,
+    T Function(dynamic) fromJson,
+    void Function(List<T>) updateState,
+  ) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      withData: true,
+    );
+    if (result == null || result.files.single.bytes == null) {
+      return "File selection canceled or no data found.";
+    }
+    try {
+      final jsonString = utf8.decode(result.files.single.bytes!);
+      final decodedList = jsonDecode(jsonString) as List<dynamic>;
+      final importedData = decodedList.map((e) => fromJson(e)).toList();
+      updateState(importedData);
+      await _saveDevices();
+      return "$key imported successfully!";
+    } catch (e) {
+      if (kDebugMode) print("Failed to import $key: $e");
+      return "Failed to import $key: Invalid file format.";
+    }
   }
 }
