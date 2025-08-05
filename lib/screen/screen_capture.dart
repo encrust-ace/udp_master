@@ -13,16 +13,19 @@ class ScreenSelectDialog extends StatefulWidget {
   State<ScreenSelectDialog> createState() => _ScreenSelectDialogState();
 }
 
-class _ScreenSelectDialogState extends State<ScreenSelectDialog> {
+class _ScreenSelectDialogState extends State<ScreenSelectDialog>
+    with TickerProviderStateMixin {
   final Map<String, DesktopCapturerSource> _sources = {};
   SourceType _sourceType = SourceType.Screen;
   DesktopCapturerSource? _selectedSource;
   final List<StreamSubscription<DesktopCapturerSource>> _subscriptions = [];
   Timer? _timer;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     Future.delayed(const Duration(milliseconds: 100), _getSources);
     _subscriptions.addAll([
       desktopCapturer.onAdded.stream.listen((source) {
@@ -42,6 +45,7 @@ class _ScreenSelectDialogState extends State<ScreenSelectDialog> {
   @override
   void dispose() {
     _timer?.cancel();
+    _tabController.dispose();
     for (var sub in _subscriptions) {
       sub.cancel();
     }
@@ -71,102 +75,207 @@ class _ScreenSelectDialogState extends State<ScreenSelectDialog> {
     final newType = index == 0 ? SourceType.Screen : SourceType.Window;
     if (_sourceType != newType) {
       _sourceType = newType;
+      _selectedSource = null;
       _getSources();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final isLargeScreen = screenSize.width > 600;
+    final dialogWidth = isLargeScreen ? 700.0 : screenSize.width * 0.9;
+    final dialogHeight = isLargeScreen ? 600.0 : screenSize.height * 0.8;
+
     return Dialog(
-      child: Column(
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Choose what to share',
-                  style: TextStyle(fontSize: 16),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: dialogWidth,
+        height: dialogHeight,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
             ),
-          ),
-      
-          // Content with tabs
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: DefaultTabController(
-                length: 2,
-                child: Column(
-                  children: [
-                    TabBar(
-                      labelColor: Colors.black,
-                      unselectedLabelColor: Colors.black54,
-                      onTap: _onTabChanged,
-                      tabs: const [
-                        Tab(text: 'Entire Screen'),
-                        Tab(text: 'Window'),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: TabBarView(
-                        children: [
-                          _buildSourceGrid(SourceType.Screen, 2),
-                          _buildSourceGrid(SourceType.Window, 3),
-                        ],
-                      ),
-                    ),
-                  ],
+          ],
+        ),
+        child: Column(
+          children: [
+            // Header with close button
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
                 ),
               ),
-            ),
-          ),
-      
-          // Action buttons
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(color: Colors.black54),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Share Your Screen',
+                    style: TextStyle(
+                      fontSize: isLargeScreen ? 20 : 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade800,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context, _selectedSource),
-                  child: const Text('Share'),
-                ),
-              ],
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: Colors.grey.shade600,
+                      size: 24,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+
+            // Tabs
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                onTap: _onTabChanged,
+                indicator: BoxDecoration(
+                  color: Colors.blue.shade600,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.grey.shade600,
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+                tabs: const [
+                  Tab(text: 'Entire Screen'),
+                  Tab(text: 'Application Window'),
+                ],
+              ),
+            ),
+
+            // Content grid
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _buildSourceGrid(isLargeScreen),
+              ),
+            ),
+
+            // Action buttons
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: _selectedSource != null
+                        ? () => Navigator.pop(context, _selectedSource)
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Share',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSourceGrid(SourceType type, int crossAxisCount) {
+  Widget _buildSourceGrid(bool isLargeScreen) {
     final filteredSources = _sources.entries
-        .where((entry) => entry.value.type == type)
+        .where((entry) => entry.value.type == _sourceType)
         .map((entry) => entry.value)
         .toList();
+
+    if (filteredSources.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.monitor_outlined,
+              size: 48,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No sources available',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final crossAxisCount = isLargeScreen
+        ? (_sourceType == SourceType.Screen ? 2 : 3)
+        : (_sourceType == SourceType.Screen ? 1 : 2);
 
     return GridView.builder(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: isLargeScreen ? 1.4 : 1.2,
       ),
       itemCount: filteredSources.length,
       itemBuilder: (context, index) {
@@ -226,36 +335,70 @@ class _ThumbnailWidgetState extends State<ThumbnailWidget> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => widget.onTap(widget.source),
-      child: Column(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: widget.selected
-                  ? BoxDecoration(
-                      border: Border.all(width: 2, color: Colors.blueAccent),
-                    )
-                  : null,
-              child: _thumbnail != null
-                  ? Image.memory(
-                      _thumbnail!,
-                      gaplessPlayback: true,
-                      fit: BoxFit.cover,
-                    )
-                  : Container(color: Colors.grey.shade200),
-            ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: widget.selected ? Colors.blue.shade600 : Colors.grey.shade300,
+            width: widget.selected ? 2 : 1,
           ),
-          const SizedBox(height: 4),
-          Text(
-            widget.source.name,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.black87,
-              fontWeight: widget.selected ? FontWeight.bold : FontWeight.normal,
+          boxShadow: widget.selected
+              ? [
+                  BoxShadow(
+                    color: Colors.blue.shade200,
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          children: [
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.grey.shade100,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: _thumbnail != null
+                      ? Image.memory(
+                          _thumbnail!,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                        )
+                      : Center(
+                          child: Icon(
+                            widget.source.type == SourceType.Screen
+                                ? Icons.monitor_outlined
+                                : Icons.window_outlined,
+                            size: 32,
+                            color: Colors.grey.shade400,
+                          ),
+                        ),
+                ),
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Text(
+                widget.source.name,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
+                  color: widget.selected ? Colors.blue.shade700 : Colors.grey.shade700,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -318,10 +461,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
       _localRenderer.srcObject = null;
 
       if (mounted) {
-        final provider = Provider.of<VisualizerProvider>(
-          context,
-          listen: false,
-        );
+        final provider = Provider.of<VisualizerProvider>(context, listen: false);
         await provider.stopScreenSync();
       }
     } catch (e) {
@@ -336,6 +476,7 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
     } else if (WebRTC.platformIsDesktop) {
       showDialog<DesktopCapturerSource>(
         context: context,
+        barrierDismissible: false,
         builder: (context) => const ScreenSelectDialog(),
       ).then((source) {
         if (source != null) _startScreenCapture(source);
@@ -346,7 +487,12 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Screen Capture")),
+      appBar: AppBar(
+        title: const Text("Screen Capture"),
+        backgroundColor: Colors.grey.shade50,
+        foregroundColor: Colors.grey.shade800,
+        elevation: 0,
+      ),
       body: _isScreenCapturing
           ? RepaintBoundary(
               key: videoKey,
@@ -356,11 +502,45 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
                 child: RTCVideoView(_localRenderer),
               ),
             )
-          : const Center(child: Text('Tap the button to start screen capture')),
-      floatingActionButton: FloatingActionButton(
+          : Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.screen_share_outlined,
+                    size: 64,
+                    color: Colors.grey.shade400,
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Ready to share your screen',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tap the button below to get started',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _toggleScreenCapture,
-        tooltip: _isScreenCapturing ? 'Stop' : 'Start',
-        child: Icon(_isScreenCapturing ? Icons.call_end : Icons.phone),
+        backgroundColor: _isScreenCapturing ? Colors.red.shade600 : Colors.blue.shade600,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        label: Text(
+          _isScreenCapturing ? 'Stop Sharing' : 'Start Sharing',
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        icon: Icon(_isScreenCapturing ? Icons.stop_rounded : Icons.play_arrow_rounded),
       ),
     );
   }
