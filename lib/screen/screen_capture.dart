@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:core';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,221 +6,192 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:provider/provider.dart';
 import 'package:udp_master/services/visualizer_provider.dart';
 
-// ignore: must_be_immutable
-class ScreenSelectDialog extends Dialog {
-  
-  ScreenSelectDialog({super.key}) {
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _getSources();
-    });
-    _subscriptions.add(
-      desktopCapturer.onAdded.stream.listen((source) {
-        _sources[source.id] = source;
-        _stateSetter?.call(() {});
-      }),
-    );
-    _subscriptions.add(
-      desktopCapturer.onRemoved.stream.listen((source) {
-        _sources.remove(source.id);
-        _stateSetter?.call(() {});
-      }),
-    );
-    _subscriptions.add(
-      desktopCapturer.onThumbnailChanged.stream.listen((source) {
-        _stateSetter?.call(() {});
-      }),
-    );
-  }
+class ScreenSelectDialog extends StatefulWidget {
+  const ScreenSelectDialog({super.key});
 
+  @override
+  State<ScreenSelectDialog> createState() => _ScreenSelectDialogState();
+}
+
+class _ScreenSelectDialogState extends State<ScreenSelectDialog> {
   final Map<String, DesktopCapturerSource> _sources = {};
   SourceType _sourceType = SourceType.Screen;
   DesktopCapturerSource? _selectedSource;
   final List<StreamSubscription<DesktopCapturerSource>> _subscriptions = [];
-  StateSetter? _stateSetter;
   Timer? _timer;
 
-  void _ok(context) {
-    _timer?.cancel();
-    for (var element in _subscriptions) {
-      element.cancel();
-    }
-    Navigator.pop<DesktopCapturerSource>(context, _selectedSource);
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 100), _getSources);
+    _subscriptions.addAll([
+      desktopCapturer.onAdded.stream.listen((source) {
+        _sources[source.id] = source;
+        if (mounted) setState(() {});
+      }),
+      desktopCapturer.onRemoved.stream.listen((source) {
+        _sources.remove(source.id);
+        if (mounted) setState(() {});
+      }),
+      desktopCapturer.onThumbnailChanged.stream.listen((_) {
+        if (mounted) setState(() {});
+      }),
+    ]);
   }
 
-  void _cancel(context) {
+  @override
+  void dispose() {
     _timer?.cancel();
-    for (var element in _subscriptions) {
-      element.cancel();
+    for (var sub in _subscriptions) {
+      sub.cancel();
     }
-    Navigator.pop<DesktopCapturerSource>(context, null);
+    super.dispose();
   }
 
   Future<void> _getSources() async {
     try {
-      var sources = await desktopCapturer.getSources(types: [_sourceType]);
+      final sources = await desktopCapturer.getSources(types: [_sourceType]);
       _timer?.cancel();
-      _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      _timer = Timer.periodic(const Duration(seconds: 3), (_) {
         desktopCapturer.updateSources(types: [_sourceType]);
       });
-      _sources.clear();
-      for (var element in sources) {
-        _sources[element.id] = element;
-      }
-      _stateSetter?.call(() {});
+
+      setState(() {
+        _sources.clear();
+        for (var source in sources) {
+          _sources[source.id] = source;
+        }
+      });
     } catch (e) {
-      // Handle error
+      debugPrint('Error getting sources: $e');
+    }
+  }
+
+  void _onTabChanged(int index) {
+    final newType = index == 0 ? SourceType.Screen : SourceType.Window;
+    if (_sourceType != newType) {
+      _sourceType = newType;
+      _getSources();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      type: MaterialType.transparency,
-      child: Center(
-        child: Container(
-          width: 640,
-          height: 560,
-          color: Colors.white,
-          child: Column(
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: <Widget>[
-                    const Text(
-                      'Choose what to share',
-                      style: TextStyle(fontSize: 16),
+    return Dialog(
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Choose what to share',
+                  style: TextStyle(fontSize: 16),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+      
+          // Content with tabs
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: DefaultTabController(
+                length: 2,
+                child: Column(
+                  children: [
+                    TabBar(
+                      labelColor: Colors.black,
+                      unselectedLabelColor: Colors.black54,
+                      onTap: _onTabChanged,
+                      tabs: const [
+                        Tab(text: 'Entire Screen'),
+                        Tab(text: 'Window'),
+                      ],
                     ),
-                    InkWell(
-                      child: const Icon(Icons.close),
-                      onTap: () => _cancel(context),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: TabBarView(
+                        children: [
+                          _buildSourceGrid(SourceType.Screen, 2),
+                          _buildSourceGrid(SourceType.Window, 3),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-              Expanded(
-                flex: 1,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  child: StatefulBuilder(
-                    builder: (context, setState) {
-                      _stateSetter = setState;
-                      return DefaultTabController(
-                        length: 2,
-                        child: Column(
-                          children: <Widget>[
-                            TabBar(
-                              labelColor: Colors.black,
-                              unselectedLabelColor: Colors.black54,
-                              onTap: (value) =>
-                                  Future.delayed(Duration.zero, () {
-                                    _sourceType = value == 0
-                                        ? SourceType.Screen
-                                        : SourceType.Window;
-                                    _getSources();
-                                  }),
-                              tabs: const [
-                                Tab(text: 'Entire Screen'),
-                                Tab(text: 'Window'),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Expanded(
-                              child: TabBarView(
-                                children: [
-                                  GridView.count(
-                                    crossAxisSpacing: 8,
-                                    crossAxisCount: 2,
-                                    children: _sources.entries
-                                        .where(
-                                          (element) =>
-                                              element.value.type ==
-                                              SourceType.Screen,
-                                        )
-                                        .map(
-                                          (e) => ThumbnailWidget(
-                                            onTap: (source) => setState(
-                                              () => _selectedSource = source,
-                                            ),
-                                            source: e.value,
-                                            selected:
-                                                _selectedSource?.id ==
-                                                e.value.id,
-                                          ),
-                                        )
-                                        .toList(),
-                                  ),
-                                  GridView.count(
-                                    crossAxisSpacing: 8,
-                                    crossAxisCount: 3,
-                                    children: _sources.entries
-                                        .where(
-                                          (element) =>
-                                              element.value.type ==
-                                              SourceType.Window,
-                                        )
-                                        .map(
-                                          (e) => ThumbnailWidget(
-                                            onTap: (source) => setState(
-                                              () => _selectedSource = source,
-                                            ),
-                                            source: e.value,
-                                            selected:
-                                                _selectedSource?.id ==
-                                                e.value.id,
-                                          ),
-                                        )
-                                        .toList(),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+            ),
+          ),
+      
+          // Action buttons
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.black54),
                   ),
                 ),
-              ),
-              SizedBox(
-                width: double.infinity,
-                child: OverflowBar(
-                  alignment: MainAxisAlignment.end,
-                  children: <Widget>[
-                    TextButton(
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(color: Colors.black54),
-                      ),
-                      onPressed: () => _cancel(context),
-                    ),
-                    ElevatedButton(
-                      child: const Text('Share'),
-                      onPressed: () => _ok(context),
-                    ),
-                  ],
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, _selectedSource),
+                  child: const Text('Share'),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildSourceGrid(SourceType type, int crossAxisCount) {
+    final filteredSources = _sources.entries
+        .where((entry) => entry.value.type == type)
+        .map((entry) => entry.value)
+        .toList();
+
+    return GridView.builder(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: filteredSources.length,
+      itemBuilder: (context, index) {
+        final source = filteredSources[index];
+        return ThumbnailWidget(
+          source: source,
+          selected: _selectedSource?.id == source.id,
+          onTap: (source) => setState(() => _selectedSource = source),
+        );
+      },
     );
   }
 }
 
 class ThumbnailWidget extends StatefulWidget {
+  final DesktopCapturerSource source;
+  final bool selected;
+  final Function(DesktopCapturerSource) onTap;
+
   const ThumbnailWidget({
     super.key,
     required this.source,
     required this.selected,
     required this.onTap,
   });
-  final DesktopCapturerSource source;
-  final bool selected;
-  final Function(DesktopCapturerSource) onTap;
 
   @override
   State<ThumbnailWidget> createState() => _ThumbnailWidgetState();
@@ -234,65 +204,63 @@ class _ThumbnailWidgetState extends State<ThumbnailWidget> {
   @override
   void initState() {
     super.initState();
-    _subscriptions.add(
-      widget.source.onThumbnailChanged.stream.listen((event) {
-        setState(() => _thumbnail = event);
+    _subscriptions.addAll([
+      widget.source.onThumbnailChanged.stream.listen((thumbnail) {
+        if (mounted) setState(() => _thumbnail = thumbnail);
       }),
-    );
-    _subscriptions.add(
-      widget.source.onNameChanged.stream.listen((event) {
-        setState(() {});
+      widget.source.onNameChanged.stream.listen((_) {
+        if (mounted) setState(() {});
       }),
-    );
+    ]);
   }
 
   @override
-  void deactivate() {
-    for (var element in _subscriptions) {
-      element.cancel();
+  void dispose() {
+    for (var sub in _subscriptions) {
+      sub.cancel();
     }
-    super.deactivate();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: Container(
-            decoration: widget.selected
-                ? BoxDecoration(
-                    border: Border.all(width: 2, color: Colors.blueAccent),
-                  )
-                : null,
-            child: InkWell(
-              onTap: () => widget.onTap(widget.source),
+    return GestureDetector(
+      onTap: () => widget.onTap(widget.source),
+      child: Column(
+        children: [
+          Expanded(
+            child: Container(
+              decoration: widget.selected
+                  ? BoxDecoration(
+                      border: Border.all(width: 2, color: Colors.blueAccent),
+                    )
+                  : null,
               child: _thumbnail != null
                   ? Image.memory(
                       _thumbnail!,
                       gaplessPlayback: true,
-                      alignment: Alignment.center,
+                      fit: BoxFit.cover,
                     )
-                  : Container(),
+                  : Container(color: Colors.grey.shade200),
             ),
           ),
-        ),
-        Text(
-          widget.source.name,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.black87,
-            fontWeight: widget.selected ? FontWeight.bold : FontWeight.normal,
+          const SizedBox(height: 4),
+          Text(
+            widget.source.name,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.black87,
+              fontWeight: widget.selected ? FontWeight.bold : FontWeight.normal,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-/*
- * getDisplayMedia sample
- */
 class ScreenCapturePage extends StatefulWidget {
   const ScreenCapturePage({super.key});
 
@@ -304,7 +272,6 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
   MediaStream? _localStream;
   final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
   bool _isScreenCapturing = false;
-  DesktopCapturerSource? selectedSource;
   final GlobalKey videoKey = GlobalKey();
 
   @override
@@ -314,34 +281,31 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
   }
 
   @override
-  void deactivate() {
-    super.deactivate();
+  void dispose() {
     _stop();
     _localRenderer.dispose();
+    super.dispose();
   }
 
-  Future<void> _startScreenCapture(DesktopCapturerSource? source) async {
-    setState(() => selectedSource = source);
+  Future<void> _startScreenCapture(DesktopCapturerSource source) async {
     try {
-      var stream = await navigator.mediaDevices.getDisplayMedia(
-        <String, dynamic>{
-          'video': source == null
-              ? true
-              : {
-                  'deviceId': {'exact': source.id},
-                  'mandatory': {'frameRate': 30.0},
-                },
+      final stream = await navigator.mediaDevices.getDisplayMedia({
+        'video': {
+          'deviceId': {'exact': source.id},
+          'mandatory': {'frameRate': 30.0},
         },
-      );
+      });
+
       _localStream = stream;
-      _localRenderer.srcObject = _localStream;
+      _localRenderer.srcObject = stream;
+
       final provider = Provider.of<VisualizerProvider>(context, listen: false);
-      await provider.startScreenSync(_localStream!, videoKey);
+      await provider.startScreenSync(stream, videoKey);
+
+      if (mounted) setState(() => _isScreenCapturing = true);
     } catch (e) {
-      // Handle error
+      debugPrint('Error starting screen capture: $e');
     }
-    if (!mounted) return;
-    setState(() => _isScreenCapturing = true);
   }
 
   Future<void> _stop() async {
@@ -352,10 +316,16 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
       await _localStream?.dispose();
       _localStream = null;
       _localRenderer.srcObject = null;
-      final provider = Provider.of<VisualizerProvider>(context, listen: false);
-      await provider.stopScreenSync();
+
+      if (mounted) {
+        final provider = Provider.of<VisualizerProvider>(
+          context,
+          listen: false,
+        );
+        await provider.stopScreenSync();
+      }
     } catch (e) {
-      // Handle error
+      debugPrint('Error stopping screen capture: $e');
     }
   }
 
@@ -363,17 +333,13 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
     if (_isScreenCapturing) {
       _stop();
       setState(() => _isScreenCapturing = false);
-    } else {
-      if (WebRTC.platformIsDesktop) {
-        showDialog<DesktopCapturerSource>(
-          context: context,
-          builder: (context) => ScreenSelectDialog(),
-        ).then((source) {
-          if (source != null) {
-            _startScreenCapture(source);
-          }
-        });
-      }
+    } else if (WebRTC.platformIsDesktop) {
+      showDialog<DesktopCapturerSource>(
+        context: context,
+        builder: (context) => const ScreenSelectDialog(),
+      ).then((source) {
+        if (source != null) _startScreenCapture(source);
+      });
     }
   }
 
@@ -381,24 +347,19 @@ class _ScreenCapturePageState extends State<ScreenCapturePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Screen Capture")),
-      body: Center(
-        child: Stack(
-          children: <Widget>[
-            if (_isScreenCapturing)
-              RepaintBoundary(
-                key: videoKey,
-                child: SizedBox(
-                  width: MediaQuery.of(context).size.width,
-                  height: MediaQuery.of(context).size.height,
-                  child: RTCVideoView(_localRenderer),
-                ),
+      body: _isScreenCapturing
+          ? RepaintBoundary(
+              key: videoKey,
+              child: SizedBox(
+                width: MediaQuery.of(context).size.width,
+                height: MediaQuery.of(context).size.height,
+                child: RTCVideoView(_localRenderer),
               ),
-          ],
-        ),
-      ),
+            )
+          : const Center(child: Text('Tap the button to start screen capture')),
       floatingActionButton: FloatingActionButton(
         onPressed: _toggleScreenCapture,
-        tooltip: _isScreenCapturing ? 'Hangup' : 'Call',
+        tooltip: _isScreenCapturing ? 'Stop' : 'Start',
         child: Icon(_isScreenCapturing ? Icons.call_end : Icons.phone),
       ),
     );
