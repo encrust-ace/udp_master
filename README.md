@@ -1,6 +1,6 @@
 # UDP Master - Smart Home Visualizer
 
-![alt text](https://github.com/your-username/udp_master/blob/main/assets/screenshot.png?raw=true)
+![alt text](https://github.com/encrustace/udp_master/blob/main/assets/screenshot.png?raw=true)
 
 ## Overview
 
@@ -45,7 +45,7 @@ Follow these steps to set up and run the UDP Master application:
 1.  Clone the repository:
 
     ```sh
-    git clone https://github.com/your-username/udp_master.git
+    git clone https://github.com/encrustace/udp_master.git
     cd udp_master
     ```
 
@@ -137,4 +137,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Author
 
-[Imran Khan]
+Imran Khan

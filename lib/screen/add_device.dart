@@ -77,7 +77,7 @@ class _AddDeviceState extends State<AddDevice> {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
 
-    if (message.contains("successfully")) {
+    if (message.contains("successful")) {
       Navigator.of(context).pop();
     }
   }

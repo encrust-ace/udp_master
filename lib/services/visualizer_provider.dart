@@ -272,7 +272,7 @@ class VisualizerProvider with ChangeNotifier {
           break;
       }
       await _saveDevices();
-      return "Action successful";
+      return "Device updated successfully";
     } catch (e) {
       return "Error: $e";
     }
