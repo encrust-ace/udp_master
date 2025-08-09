@@ -1,6 +1,5 @@
 # UDP Master - Smart Home Visualizer
 
-![alt text](https://github.com/encrustace/udp_master/blob/main/assets/screenshot.png?raw=true)
 
 ## Overview
 
