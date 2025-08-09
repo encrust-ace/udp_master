@@ -666,9 +666,36 @@ class VisualizerProvider with ChangeNotifier {
   Future<void> _restoreEffects(SharedPreferences prefs) async {
     final effectList = prefs.getStringList('effects') ?? [];
     for (var effectJson in effectList) {
-      final effect = LedEffect.fromJson(json.decode(effectJson));
-      if (_effects.containsKey(effect.id)) {
-        _effects[effect.id] = effect;
+      try {
+        final savedEffect = LedEffect.fromJson(json.decode(effectJson));
+        if (_effects.containsKey(savedEffect.id)) {
+          // Get the current effect from _effects
+          final currentEffect = _effects[savedEffect.id]!;
+
+          // Merge parameters: keep saved values, but use current parameter definitions
+          final mergedParameters = <String, Map<String, dynamic>>{};
+          currentEffect.parameters.forEach((key, currentParam) {
+            if (savedEffect.parameters.containsKey(key)) {
+              // Use the saved value, but keep the current min/max/steps/default
+              mergedParameters[key] = {
+                ...currentParam,
+                'value': savedEffect.parameters[key]!['value'],
+              };
+            } else {
+              // If the parameter doesn't exist in the saved effect, use the current one
+              mergedParameters[key] = currentParam;
+            }
+          });
+
+          // Update the effect in _effects with merged parameters and current name/id
+          _effects[savedEffect.id] = currentEffect.copyWith(
+            parameters: mergedParameters,
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print("Error decoding or merging effect: $e");
+        }
       }
     }
   }
