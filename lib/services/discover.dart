@@ -284,7 +284,7 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
               Segment(
                 id: 'segment_1',
                 startIndex: 0,
-                endIndex: device.ledCount - 1,
+                endIndex: device.ledCount,
               ),
             ],
           ),
