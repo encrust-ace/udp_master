@@ -1,11 +1,10 @@
-import 'package:udp_master/models.dart';
 import 'package:udp_master/services/audio_analyzer.dart';
 
 double _previousBarStrength = 0.0;
 final AutoGainController agc = AutoGainController();
 
 List<int> renderVerticalBars({
-  required LedDevice device,
+  required int ledCount,
   required AudioFeatures features,
   required double brightness,
   required double saturation,
@@ -30,25 +29,22 @@ List<int> renderVerticalBars({
 
   final double barStrength = _previousBarStrength;
 
-  for (Segment segment in device.segments) {
-    final int count = segment.endIndex - segment.startIndex + 1;
-    for (int i = 0; i < count; i++) {
-      final double pos = (i + 0.5) / count;
-      final double strength = ((barStrength - pos) * count).clamp(0.0, 1.0);
+  for (int i = 0; i < ledCount; i++) {
+    final double pos = (i + 0.5) / ledCount;
+    final double strength = ((barStrength - pos) * ledCount).clamp(0.0, 1.0);
 
-      if (strength > 0) {
-        final double hue = (features.hue % 360) / 360;
-        final double beatBoost = features.isBeat ? 1.2 : 1.0;
+    if (strength > 0) {
+      final double hue = (features.hue % 360) / 360;
+      final double beatBoost = features.isBeat ? 1.2 : 1.0;
 
-        final fadedColor = hsvToRgb(
-          hue,
-          saturation,
-          (brightness * strength * beatBoost).clamp(0.0, 1.0),
-        );
-        packet.addAll(fadedColor);
-      } else {
-        packet.addAll([0, 0, 0]);
-      }
+      final fadedColor = hsvToRgb(
+        hue,
+        saturation,
+        (brightness * strength * beatBoost).clamp(0.0, 1.0),
+      );
+      packet.addAll(fadedColor);
+    } else {
+      packet.addAll([0, 0, 0]);
     }
   }
 

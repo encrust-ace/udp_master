@@ -182,6 +182,7 @@ class _AddDeviceState extends State<AddDevice> {
                 return Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Row(
+                    spacing: 12,
                     children: [
                       Expanded(
                         child: TextFormField(
@@ -199,7 +200,6 @@ class _AddDeviceState extends State<AddDevice> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 12),
                       Expanded(
                         child: TextFormField(
                           decoration: _inputDecoration(
@@ -217,7 +217,6 @@ class _AddDeviceState extends State<AddDevice> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 12),
                       Expanded(
                         child: TextFormField(
                           decoration: _inputDecoration(
@@ -234,6 +233,16 @@ class _AddDeviceState extends State<AddDevice> {
                             });
                           },
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete),
+                        onPressed: index != 0
+                            ? () {
+                                setState(() {
+                                  _segments.removeAt(index);
+                                });
+                              }
+                            : null,
                       ),
                     ],
                   ),

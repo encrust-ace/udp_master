@@ -1,10 +1,9 @@
-import 'package:udp_master/models.dart';
 import 'package:udp_master/services/audio_analyzer.dart';
 
 final AutoGainController agcCenter = AutoGainController();
 
 List<int> renderCenterPulsePacket({
-  required LedDevice device,
+  required int ledCount,
   required AudioFeatures features,
   required double gain,
   required double saturation,
@@ -26,22 +25,19 @@ List<int> renderCenterPulsePacket({
   final double hue = (features.hue % 360) / 360;
   final double beatBoost = features.isBeat ? 1.2 : 1.0;
 
-  for (Segment segment in device.segments) {
-    final int count = segment.endIndex - segment.startIndex + 1;
-    final double half = count / 2;
-    final double spread = rawStrength * half;
+  final double half = ledCount / 2;
+  final double spread = rawStrength * half;
 
-    for (int i = 0; i < count; i++) {
-      final double dist = (i - half + 0.5).abs(); // symmetrical from center
+  for (int i = 0; i < ledCount; i++) {
+    final double dist = (i - half + 0.5).abs(); // symmetrical from center
 
-      if (dist < spread) {
-        final double intensity =
-            ((1.0 - (dist / spread)) * beatBoost * brightness).clamp(0.0, 1.0);
-        final rgb = hsvToRgb(hue, saturation, intensity);
-        packet.addAll(rgb);
-      } else {
-        packet.addAll([0, 0, 0]);
-      }
+    if (dist < spread) {
+      final double intensity =
+          ((1.0 - (dist / spread)) * beatBoost * brightness).clamp(0.0, 1.0);
+      final rgb = hsvToRgb(hue, saturation, intensity);
+      packet.addAll(rgb);
+    } else {
+      packet.addAll([0, 0, 0]);
     }
   }
   return packet;

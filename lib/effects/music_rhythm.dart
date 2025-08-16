@@ -1,4 +1,3 @@
-import 'package:udp_master/models.dart';
 import 'package:udp_master/services/audio_analyzer.dart';
 
 // Enum to define which frequency band (bass, mids, highs) we are listening for beats.
@@ -25,7 +24,7 @@ double _rainbowHueOffset = 0.0; // Current position in the rainbow color cycle.
 final double _rainbowSpeed = 0.005; // How fast the rainbow colors cycle.
 
 List<int> renderBeatDropEffect({
-  required LedDevice device,
+  required int ledCount,
   required AudioFeatures features,
   required double gain,
   required double brightness,
@@ -85,48 +84,45 @@ List<int> renderBeatDropEffect({
   final int risingBottomLeds = _currentRisingLedsCount.round();
   final int dropLedPosition = _currentDropLogicalPos.floor();
 
-  for (Segment segment in device.segments) {
-    final int count = segment.endIndex - segment.startIndex + 1;
-    _currentRisingLedsCount = _currentRisingLedsCount.clamp(
-      0.0,
-      count.toDouble(),
-    );
+  _currentRisingLedsCount = _currentRisingLedsCount.clamp(
+    0.0,
+    ledCount.toDouble(),
+  );
 
-    if (_currentDropLogicalPos < count) {
-      _currentDropLogicalPos += dropSpeed;
-    } else {
-      _currentDropLogicalPos += raiseSpeed;
-      if (_currentDropLogicalPos >= count + count * 0.5) {
-        _currentDropLogicalPos = 0.0;
-      }
-      if (_currentDropLogicalPos >= count) {
-        _currentDropLogicalPos = -(count - 1).toDouble();
-      }
+  if (_currentDropLogicalPos < ledCount) {
+    _currentDropLogicalPos += dropSpeed;
+  } else {
+    _currentDropLogicalPos += raiseSpeed;
+    if (_currentDropLogicalPos >= ledCount + ledCount * 0.5) {
+      _currentDropLogicalPos = 0.0;
     }
-    for (int i = 0; i < count; i++) {
-      List<int> ledColor = [0, 0, 0];
-
-      if (i < risingBottomLeds) {
-        double hue = (_rainbowHueOffset + (i / count)) % 1.0;
-        ledColor = hsvToRgb(hue, saturation, brightness);
-      }
-
-      if (i == 0) {
-        double hue = _rainbowHueOffset;
-        ledColor = hsvToRgb(hue, saturation, brightness);
-      }
-
-      int actualDropLedIndex = count - 1 - dropLedPosition;
-      if (dropLedPosition >= 0 &&
-          dropLedPosition < count &&
-          i == actualDropLedIndex) {
-        double dropHue =
-            (_rainbowHueOffset + (actualDropLedIndex / count)) % 1.0;
-        ledColor = hsvToRgb(dropHue, saturation, brightness);
-      }
-
-      packet.addAll(ledColor);
+    if (_currentDropLogicalPos >= ledCount) {
+      _currentDropLogicalPos = -(ledCount - 1).toDouble();
     }
+  }
+  for (int i = 0; i < ledCount; i++) {
+    List<int> ledColor = [0, 0, 0];
+
+    if (i < risingBottomLeds) {
+      double hue = (_rainbowHueOffset + (i / ledCount)) % 1.0;
+      ledColor = hsvToRgb(hue, saturation, brightness);
+    }
+
+    if (i == 0) {
+      double hue = _rainbowHueOffset;
+      ledColor = hsvToRgb(hue, saturation, brightness);
+    }
+
+    int actualDropLedIndex = ledCount - 1 - dropLedPosition;
+    if (dropLedPosition >= 0 &&
+        dropLedPosition < ledCount &&
+        i == actualDropLedIndex) {
+      double dropHue =
+          (_rainbowHueOffset + (actualDropLedIndex / ledCount)) % 1.0;
+      ledColor = hsvToRgb(dropHue, saturation, brightness);
+    }
+
+    packet.addAll(ledColor);
   }
 
   return packet;

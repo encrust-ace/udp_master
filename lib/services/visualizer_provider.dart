@@ -430,38 +430,46 @@ class VisualizerProvider with ChangeNotifier {
     LedEffect effect,
     AudioFeatures features,
   ) {
-    switch (effect.id) {
-      case 'vertical-bars':
-        return renderVerticalBars(
-          device: device,
-          features: features,
-          gain: effect.parameters["gain"]!['value'],
-          brightness: effect.parameters["brightness"]!['value'],
-          saturation: effect.parameters["saturation"]!['value'],
-          smooth: effect.parameters["smooth"]!['value'],
-        );
-      case 'center-pulse':
-        return renderCenterPulsePacket(
-          device: device,
-          features: features,
-          gain: effect.parameters["gain"]!['value'],
-          brightness: effect.parameters["brightness"]!['value'],
-          saturation: effect.parameters["saturation"]!['value'],
-        );
-      case 'music-rhythm':
-        return renderBeatDropEffect(
-          device: device,
-          features: features,
-          gain: effect.parameters["gain"]!['value'],
-          brightness: effect.parameters["brightness"]!['value'],
-          saturation: effect.parameters["saturation"]!['value'],
-          raiseSpeed: effect.parameters["raiseSpeed"]!['value'],
-          decaySpeed: effect.parameters["decaySpeed"]!['value'],
-          dropSpeed: effect.parameters["dropSpeed"]!['value'],
-        );
-      default:
-        return [];
+    List<int> packetData = [];
+
+    for (Segment segment in device.segments) {
+      List<int> segmentPacketData = [];
+
+      switch (effect.id) {
+        case 'vertical-bars':
+          segmentPacketData = renderVerticalBars(
+            ledCount: segment.endIndex - segment.startIndex + 1,
+            features: features,
+            gain: effect.parameters["gain"]!['value'],
+            brightness: effect.parameters["brightness"]!['value'],
+            saturation: effect.parameters["saturation"]!['value'],
+            smooth: effect.parameters["smooth"]!['value'],
+          );
+        case 'center-pulse':
+          segmentPacketData = renderCenterPulsePacket(
+            ledCount: segment.endIndex - segment.startIndex + 1,
+            features: features,
+            gain: effect.parameters["gain"]!['value'],
+            brightness: effect.parameters["brightness"]!['value'],
+            saturation: effect.parameters["saturation"]!['value'],
+          );
+        case 'music-rhythm':
+          segmentPacketData = renderBeatDropEffect(
+            ledCount: segment.endIndex - segment.startIndex + 1,
+            features: features,
+            gain: effect.parameters["gain"]!['value'],
+            brightness: effect.parameters["brightness"]!['value'],
+            saturation: effect.parameters["saturation"]!['value'],
+            raiseSpeed: effect.parameters["raiseSpeed"]!['value'],
+            decaySpeed: effect.parameters["decaySpeed"]!['value'],
+            dropSpeed: effect.parameters["dropSpeed"]!['value'],
+          );
+      }
+      if (segmentPacketData.isNotEmpty) {
+        packetData.addAll(segmentPacketData);
+      }
     }
+    return packetData;
   }
 
   void _processAudioData(AudioFeatures features) {
