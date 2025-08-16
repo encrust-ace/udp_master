@@ -87,6 +87,40 @@ class _AddDeviceState extends State<AddDevice> {
     );
   }
 
+  String? indexValidator(int segmentIndex, String? value, String fieldName) {
+    final totalLeds =
+        int.tryParse(_ledCountController.text.trim()) ?? widget.device.ledCount;
+    final n = int.tryParse(value ?? '');
+
+    if (n == null) return 'Invalid $fieldName';
+
+    // --- START INDEX RULES ---
+    if (fieldName == "start") {
+      if (n < 0) return 'Start must be >= 0';
+      if (n >= totalLeds) return 'Start must be < $totalLeds';
+
+      if (segmentIndex > 0) {
+        final prevEnd = _segments[segmentIndex - 1].endIndex;
+        if (n <= prevEnd) {
+          return 'Start must be > previous segment end ($prevEnd)';
+        }
+      }
+    }
+
+    // --- END INDEX RULES ---
+    if (fieldName == "end") {
+      if (n < 0) return 'End must be >= 0';
+      if (n > totalLeds) return 'End must be < $totalLeds';
+
+      final start = _segments[segmentIndex].startIndex;
+      if (n <= start) {
+        return 'End must be > start ($start)';
+      }
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -109,6 +143,7 @@ class _AddDeviceState extends State<AddDevice> {
                       Icons.label,
                       "Staircase",
                     ),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     validator: (value) => value == null || value.trim().isEmpty
                         ? 'Required'
                         : null,
@@ -121,6 +156,7 @@ class _AddDeviceState extends State<AddDevice> {
                     controller: _ledCountController,
                     decoration: _inputDecoration("LEDs", Icons.light, "90"),
                     keyboardType: TextInputType.number,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     validator: (value) {
                       final n = int.tryParse(value ?? '');
                       if (n == null || n <= 0) return 'Enter valid count';
@@ -146,6 +182,7 @@ class _AddDeviceState extends State<AddDevice> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     validator: (value) => value == null || value.trim().isEmpty
                         ? 'Required'
                         : null,
@@ -162,6 +199,7 @@ class _AddDeviceState extends State<AddDevice> {
                       Icons.settings_ethernet,
                     ),
                     keyboardType: TextInputType.number,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     validator: (value) {
                       final n = int.tryParse(value ?? '');
                       if (n == null || n <= 0) return 'Invalid port';
@@ -177,7 +215,6 @@ class _AddDeviceState extends State<AddDevice> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _segments.length,
-
               itemBuilder: (context, index) {
                 return Padding(
                   padding: const EdgeInsets.all(8.0),
@@ -208,6 +245,7 @@ class _AddDeviceState extends State<AddDevice> {
                           ),
                           initialValue: _segments[index].startIndex.toString(),
                           keyboardType: TextInputType.number,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
                           onChanged: (value) {
                             setState(() {
                               _segments[index] = _segments[index].copyWith(
@@ -215,6 +253,8 @@ class _AddDeviceState extends State<AddDevice> {
                               );
                             });
                           },
+                          validator: (value) =>
+                              indexValidator(index, value, 'start'),
                         ),
                       ),
                       Expanded(
@@ -225,6 +265,7 @@ class _AddDeviceState extends State<AddDevice> {
                           ),
                           initialValue: _segments[index].endIndex.toString(),
                           keyboardType: TextInputType.number,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
                           onChanged: (value) {
                             setState(() {
                               _segments[index] = _segments[index].copyWith(
@@ -232,6 +273,8 @@ class _AddDeviceState extends State<AddDevice> {
                               );
                             });
                           },
+                          validator: (value) =>
+                              indexValidator(index, value, 'end'),
                         ),
                       ),
                       IconButton(
@@ -262,7 +305,7 @@ class _AddDeviceState extends State<AddDevice> {
                   );
                 });
               },
-              child: Text("Add new segment"),
+              child: const Text("Add new segment"),
             ),
 
             // Device Type Dropdown
@@ -283,6 +326,7 @@ class _AddDeviceState extends State<AddDevice> {
                   });
                 }
               },
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               validator: (value) => value == null ? 'Select device type' : null,
             ),
 

@@ -438,7 +438,7 @@ class VisualizerProvider with ChangeNotifier {
       switch (effect.id) {
         case 'vertical-bars':
           segmentPacketData = renderVerticalBars(
-            ledCount: segment.endIndex - segment.startIndex + 1,
+            ledCount: segment.endIndex - segment.startIndex,
             features: features,
             gain: effect.parameters["gain"]!['value'],
             brightness: effect.parameters["brightness"]!['value'],
@@ -447,7 +447,7 @@ class VisualizerProvider with ChangeNotifier {
           );
         case 'center-pulse':
           segmentPacketData = renderCenterPulsePacket(
-            ledCount: segment.endIndex - segment.startIndex + 1,
+            ledCount: segment.endIndex - segment.startIndex,
             features: features,
             gain: effect.parameters["gain"]!['value'],
             brightness: effect.parameters["brightness"]!['value'],
@@ -455,7 +455,7 @@ class VisualizerProvider with ChangeNotifier {
           );
         case 'music-rhythm':
           segmentPacketData = renderBeatDropEffect(
-            ledCount: segment.endIndex - segment.startIndex + 1,
+            ledCount: segment.endIndex - segment.startIndex,
             features: features,
             gain: effect.parameters["gain"]!['value'],
             brightness: effect.parameters["brightness"]!['value'],
