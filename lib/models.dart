@@ -106,6 +106,7 @@ class LedDevice {
     'effect': effect,
     'isEffectEnabled': isEffectEnabled,
     'type': type.name,
+    'segments': segments?.map((s) => s.toJson()).toList(),
   };
 
   factory LedDevice.fromJson(Map<String, dynamic> json) {

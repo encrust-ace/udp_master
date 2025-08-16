@@ -11,9 +11,6 @@ List<int> renderVerticalBars({
   required double saturation,
   double gain = 0.0, // NEW PARAMETER
 }) {
-  final int count = device.ledCount;
-  if (count == 0) return [0x02, 0x04];
-
   final List<int> packet = [0x02, 0x04];
 
   // Use AGC if userGain is 0, otherwise use userGain directly
@@ -34,22 +31,25 @@ List<int> renderVerticalBars({
 
   final double barStrength = _previousBarStrength;
 
-  for (int i = 0; i < count; i++) {
-    final double pos = (i + 0.5) / count;
-    final double strength = ((barStrength - pos) * count).clamp(0.0, 1.0);
+  for (Segment segment in device.segments ?? []) {
+    final int count = segment.endIndex - segment.startIndex + 1;
+    for (int i = 0; i < count; i++) {
+      final double pos = (i + 0.5) / count;
+      final double strength = ((barStrength - pos) * count).clamp(0.0, 1.0);
 
-    if (strength > 0) {
-      final double hue = (features.hue % 360) / 360;
-      final double beatBoost = features.isBeat ? 1.2 : 1.0;
+      if (strength > 0) {
+        final double hue = (features.hue % 360) / 360;
+        final double beatBoost = features.isBeat ? 1.2 : 1.0;
 
-      final fadedColor = hsvToRgb(
-        hue,
-        saturation,
-        (brightness * strength * beatBoost).clamp(0.0, 1.0),
-      );
-      packet.addAll(fadedColor);
-    } else {
-      packet.addAll([0, 0, 0]);
+        final fadedColor = hsvToRgb(
+          hue,
+          saturation,
+          (brightness * strength * beatBoost).clamp(0.0, 1.0),
+        );
+        packet.addAll(fadedColor);
+      } else {
+        packet.addAll([0, 0, 0]);
+      }
     }
   }
 
