@@ -3,12 +3,51 @@ enum DeviceAction { add, update, delete }
 enum DeviceType {
   wled('Wled', 21324),
   wiz('Wiz', 38899),
-  esphome('ESP Home', 21324),
-  tuya('Tuya', 21324);
+  esphome('ESP Home', 21324);
 
   const DeviceType(this.label, this.port);
   final String label;
   final int port;
+}
+
+class Segment {
+  final String id;
+  final int startIndex;
+  final int endIndex;
+
+  Segment({
+    required this.id,
+    required this.startIndex,
+    required this.endIndex,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'startIndex': startIndex,
+    'endIndex': endIndex,
+  };
+
+  factory Segment.fromJson(Map<String, dynamic> json) {
+    return Segment(
+      id: json['id'] as String,
+      startIndex: json['startIndex'] as int,
+      endIndex: json['endIndex'] as int,
+    );
+  }
+
+  Segment copyWith({
+    String? id,
+    String? name,
+    int? startIndex,
+    int? endIndex,
+    LedDevice? device,
+  }) {
+    return Segment(
+      id: id ?? this.id, 
+      startIndex: startIndex ?? this.startIndex,
+      endIndex: endIndex ?? this.endIndex,
+    );
+  }
 }
 
 class LedDevice {
@@ -20,6 +59,7 @@ class LedDevice {
   final String effect;
   final bool isEffectEnabled;
   final DeviceType type;
+  final List<Segment>? segments;
 
   LedDevice({
     required this.id,
@@ -30,6 +70,7 @@ class LedDevice {
     required this.effect,
     required this.isEffectEnabled,
     required this.type,
+    required this.segments,
   });
 
   LedDevice copyWith({
@@ -41,6 +82,7 @@ class LedDevice {
     DeviceType? type,
     String? effect,
     bool? isEffectEnabled,
+    List<Segment>? segments,
   }) {
     return LedDevice(
       id: id ?? this.id, // ID should not change
@@ -51,6 +93,7 @@ class LedDevice {
       type: type ?? this.type,
       effect: effect ?? this.effect,
       isEffectEnabled: isEffectEnabled ?? this.isEffectEnabled,
+      segments: segments ?? this.segments,
     );
   }
 
@@ -78,6 +121,9 @@ class LedDevice {
         (type) => type.name == json['type'],
         orElse: () => DeviceType.wled, // fallback if unknown
       ),
+      segments: (json['segments'] as List<dynamic>?)
+          ?.map((e) => Segment.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 

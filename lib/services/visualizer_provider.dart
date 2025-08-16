@@ -487,6 +487,7 @@ class VisualizerProvider with ChangeNotifier {
       effect: effect.id,
       isEffectEnabled: true,
       type: DeviceType.wled,
+      segments: [Segment(id: 'segment_1', startIndex: 0, endIndex: 89)],
     );
 
     List<int> packetData = [];

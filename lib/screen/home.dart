@@ -236,6 +236,20 @@ class _HomeState extends State<Home> {
               ),
             ],
           ),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: device.segments?.length ?? 0,
+            itemBuilder: (context, index) {
+              final segment = device.segments![index];
+              return ListTile(
+                title: Text('Segment ${index + 1}'),
+                subtitle: Text(
+                  'Start: ${segment.startIndex}, End: ${segment.endIndex}',
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 8),
           _buildDeviceControls(context, device, provider),
         ],

@@ -155,9 +155,7 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
         return _discoverBonsoirDevices();
       case DeviceType.wiz:
         return _discoverWizDevices();
-      default:
-        return [];
-    }
+      }
   }
 
   Future<List<Device>> _discoverBonsoirDevices() async {
@@ -283,6 +281,13 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
             effect: '',
             isEffectEnabled: true,
             type: deviceType,
+            segments: [
+              Segment(
+                id: 'segment_1',
+                startIndex: 0,
+                endIndex: device.ledCount - 1,
+              ),
+            ],
           ),
           action: DeviceAction.add,
         ),

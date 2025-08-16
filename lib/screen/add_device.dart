@@ -7,11 +7,7 @@ class AddDevice extends StatefulWidget {
   final LedDevice device;
   final DeviceAction action;
 
-  const AddDevice({
-    super.key,
-    required this.device,
-    required this.action,
-  });
+  const AddDevice({super.key, required this.device, required this.action});
 
   @override
   State<AddDevice> createState() => _AddDeviceState();
@@ -24,6 +20,7 @@ class _AddDeviceState extends State<AddDevice> {
   final _ipController = TextEditingController();
   final _portController = TextEditingController(text: '21324');
   late LedEffect _selectedEffect;
+  late List<Segment> _segments;
 
   DeviceType _selectedDeviceType = DeviceType.wled;
 
@@ -43,6 +40,9 @@ class _AddDeviceState extends State<AddDevice> {
     _ledCountController.text = d.ledCount.toString();
     _portController.text = d.port.toString();
     _selectedDeviceType = d.type;
+    _segments =
+        d.segments ??
+        [Segment(id: 'segment_1', startIndex: 0, endIndex: d.ledCount - 1)];
   }
 
   @override
@@ -68,14 +68,16 @@ class _AddDeviceState extends State<AddDevice> {
       isEffectEnabled: widget.device.isEffectEnabled,
       type: _selectedDeviceType,
       port: int.parse(_portController.text.trim()),
+      segments: _segments,
     );
 
     final message = await provider.deviceActions(device, widget.action);
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
 
     if (message.contains("successful")) {
       Navigator.of(context).pop();
@@ -104,6 +106,7 @@ class _AddDeviceState extends State<AddDevice> {
       child: Form(
         key: _formKey,
         child: Column(
+          spacing: 24,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Name & LED count
@@ -113,9 +116,14 @@ class _AddDeviceState extends State<AddDevice> {
                   flex: 3,
                   child: TextFormField(
                     controller: _nameController,
-                    decoration: _inputDecoration("Name", Icons.label, "Staircase"),
-                    validator: (value) =>
-                        value == null || value.trim().isEmpty ? 'Required' : null,
+                    decoration: _inputDecoration(
+                      "Name",
+                      Icons.label,
+                      "Staircase",
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Required'
+                        : null,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -134,7 +142,6 @@ class _AddDeviceState extends State<AddDevice> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
 
             // IP & Port
             Row(
@@ -143,10 +150,17 @@ class _AddDeviceState extends State<AddDevice> {
                   flex: 3,
                   child: TextFormField(
                     controller: _ipController,
-                    decoration: _inputDecoration("IP Address", Icons.computer, "192.168.1.100"),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    validator: (value) =>
-                        value == null || value.trim().isEmpty ? 'Required' : null,
+                    decoration: _inputDecoration(
+                      "IP Address",
+                      Icons.computer,
+                      "192.168.1.100",
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Required'
+                        : null,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -155,7 +169,10 @@ class _AddDeviceState extends State<AddDevice> {
                   child: TextFormField(
                     readOnly: true,
                     controller: _portController,
-                    decoration: _inputDecoration("Port", Icons.settings_ethernet),
+                    decoration: _inputDecoration(
+                      "Port",
+                      Icons.settings_ethernet,
+                    ),
                     keyboardType: TextInputType.number,
                     validator: (value) {
                       final n = int.tryParse(value ?? '');
@@ -166,17 +183,107 @@ class _AddDeviceState extends State<AddDevice> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
 
+            // Segments
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _segments.length,
+
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          decoration: _inputDecoration(
+                            "Segment ID",
+                            Icons.segment,
+                          ),
+                          initialValue: _segments[index].id,
+                          onChanged: (value) {
+                            setState(() {
+                              _segments[index] = _segments[index].copyWith(
+                                id: value,
+                              );
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          decoration: _inputDecoration(
+                            "Start Index",
+                            Icons.arrow_forward,
+                          ),
+                          initialValue: _segments[index].startIndex.toString(),
+                          keyboardType: TextInputType.number,
+                          onChanged: (value) {
+                            setState(() {
+                              _segments[index] = _segments[index].copyWith(
+                                startIndex: int.tryParse(value) ?? 0,
+                              );
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          decoration: _inputDecoration(
+                            "End Index",
+                            Icons.arrow_back,
+                          ),
+                          initialValue: _segments[index].endIndex.toString(),
+                          keyboardType: TextInputType.number,
+                          onChanged: (value) {
+                            setState(() {
+                              _segments[index] = _segments[index].copyWith(
+                                endIndex: int.tryParse(value) ?? 0,
+                              );
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _segments.add(
+                    Segment(
+                      id: 'segment_${_segments.length + 1}',
+                      startIndex: 0,
+                      endIndex: widget.device.ledCount - 1,
+                    ),
+                  );
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                fixedSize: const Size(44, 44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              child: const Icon(Icons.add, size: 24),
+            ),
             // Effect Dropdown
             DropdownButtonFormField<LedEffect>(
               decoration: _inputDecoration("Effect", Icons.style),
               value: _selectedEffect,
               items: provider.effects
-                  .map((effect) => DropdownMenuItem(
-                        value: effect,
-                        child: Text(effect.name),
-                      ))
+                  .map(
+                    (effect) => DropdownMenuItem(
+                      value: effect,
+                      child: Text(effect.name),
+                    ),
+                  )
                   .toList(),
               onChanged: (val) {
                 if (val != null) {
@@ -185,17 +292,16 @@ class _AddDeviceState extends State<AddDevice> {
               },
               validator: (value) => value == null ? 'Select effect' : null,
             ),
-            const SizedBox(height: 24),
 
             // Device Type Dropdown
             DropdownButtonFormField<DeviceType>(
               decoration: _inputDecoration("Device Type", Icons.device_hub),
               value: _selectedDeviceType,
               items: DeviceType.values
-                  .map((type) => DropdownMenuItem(
-                        value: type,
-                        child: Text(type.name),
-                      ))
+                  .map(
+                    (type) =>
+                        DropdownMenuItem(value: type, child: Text(type.name)),
+                  )
                   .toList(),
               onChanged: (val) {
                 if (val != null) {
@@ -207,7 +313,6 @@ class _AddDeviceState extends State<AddDevice> {
               },
               validator: (value) => value == null ? 'Select device type' : null,
             ),
-            const SizedBox(height: 24),
 
             // Action Buttons
             Row(
@@ -220,9 +325,11 @@ class _AddDeviceState extends State<AddDevice> {
                 const SizedBox(width: 12),
                 ElevatedButton(
                   onPressed: _submit,
-                  child: Text(widget.action == DeviceAction.add
-                      ? "Add Device"
-                      : "Update Device"),
+                  child: Text(
+                    widget.action == DeviceAction.add
+                        ? "Add Device"
+                        : "Update Device",
+                  ),
                 ),
               ],
             ),
