@@ -34,9 +34,6 @@ List<int> renderBeatDropEffect({
   required double decaySpeed,
   required double dropSpeed,
 }) {
-  final int count = device.ledCount;
-  if (count == 0) return [0x02, 0x04];
-
   final List<int> packet = [0x02, 0x04];
   final int now = DateTime.now().millisecondsSinceEpoch;
 
@@ -83,50 +80,53 @@ List<int> renderBeatDropEffect({
     _currentRisingLedsCount -= decaySpeed;
   }
 
-  _currentRisingLedsCount = _currentRisingLedsCount.clamp(
-    0.0,
-    count.toDouble(),
-  );
-
-  if (_currentDropLogicalPos < count) {
-    _currentDropLogicalPos += dropSpeed;
-  } else {
-    _currentDropLogicalPos += raiseSpeed;
-    if (_currentDropLogicalPos >= count + count * 0.5) {
-      _currentDropLogicalPos = 0.0;
-    }
-    if (_currentDropLogicalPos >= count) {
-      _currentDropLogicalPos = -(count - 1).toDouble();
-    }
-  }
-
   _rainbowHueOffset = (_rainbowHueOffset + _rainbowSpeed) % 1.0;
 
   final int risingBottomLeds = _currentRisingLedsCount.round();
   final int dropLedPosition = _currentDropLogicalPos.floor();
 
-  for (int i = 0; i < count; i++) {
-    List<int> ledColor = [0, 0, 0];
+  for (Segment segment in device.segments ?? []) {
+    final int count = segment.endIndex - segment.startIndex + 1;
+    _currentRisingLedsCount = _currentRisingLedsCount.clamp(
+      0.0,
+      count.toDouble(),
+    );
 
-    if (i < risingBottomLeds) {
-      double hue = (_rainbowHueOffset + (i / count)) % 1.0;
-      ledColor = hsvToRgb(hue, saturation, brightness);
+    if (_currentDropLogicalPos < count) {
+      _currentDropLogicalPos += dropSpeed;
+    } else {
+      _currentDropLogicalPos += raiseSpeed;
+      if (_currentDropLogicalPos >= count + count * 0.5) {
+        _currentDropLogicalPos = 0.0;
+      }
+      if (_currentDropLogicalPos >= count) {
+        _currentDropLogicalPos = -(count - 1).toDouble();
+      }
     }
+    for (int i = 0; i < count; i++) {
+      List<int> ledColor = [0, 0, 0];
 
-    if (i == 0) {
-      double hue = _rainbowHueOffset;
-      ledColor = hsvToRgb(hue, saturation, brightness);
+      if (i < risingBottomLeds) {
+        double hue = (_rainbowHueOffset + (i / count)) % 1.0;
+        ledColor = hsvToRgb(hue, saturation, brightness);
+      }
+
+      if (i == 0) {
+        double hue = _rainbowHueOffset;
+        ledColor = hsvToRgb(hue, saturation, brightness);
+      }
+
+      int actualDropLedIndex = count - 1 - dropLedPosition;
+      if (dropLedPosition >= 0 &&
+          dropLedPosition < count &&
+          i == actualDropLedIndex) {
+        double dropHue =
+            (_rainbowHueOffset + (actualDropLedIndex / count)) % 1.0;
+        ledColor = hsvToRgb(dropHue, saturation, brightness);
+      }
+
+      packet.addAll(ledColor);
     }
-
-    int actualDropLedIndex = count - 1 - dropLedPosition;
-    if (dropLedPosition >= 0 &&
-        dropLedPosition < count &&
-        i == actualDropLedIndex) {
-      double dropHue = (_rainbowHueOffset + (actualDropLedIndex / count)) % 1.0;
-      ledColor = hsvToRgb(dropHue, saturation, brightness);
-    }
-
-    packet.addAll(ledColor);
   }
 
   return packet;
