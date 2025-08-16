@@ -19,7 +19,6 @@ class _AddDeviceState extends State<AddDevice> {
   final _ledCountController = TextEditingController();
   final _ipController = TextEditingController();
   final _portController = TextEditingController(text: '21324');
-  late LedEffect _selectedEffect;
   late List<Segment> _segments;
 
   DeviceType _selectedDeviceType = DeviceType.wled;
@@ -29,20 +28,12 @@ class _AddDeviceState extends State<AddDevice> {
     super.initState();
     final d = widget.device;
 
-    final provider = Provider.of<VisualizerProvider>(context, listen: false);
-
-    _selectedEffect = d.effect.isNotEmpty
-        ? provider.getEffectById(d.effect)
-        : provider.effects.first;
-
     _nameController.text = d.name;
     _ipController.text = d.ip;
     _ledCountController.text = d.ledCount.toString();
     _portController.text = d.port.toString();
     _selectedDeviceType = d.type;
-    _segments =
-        d.segments ??
-        [Segment(id: 'segment_1', startIndex: 0, endIndex: d.ledCount - 1)];
+    _segments = d.segments;
   }
 
   @override
@@ -64,7 +55,6 @@ class _AddDeviceState extends State<AddDevice> {
       name: _nameController.text.trim(),
       ip: _ipController.text.trim(),
       ledCount: int.parse(_ledCountController.text.trim()),
-      effect: _selectedEffect.id,
       isEffectEnabled: widget.device.isEffectEnabled,
       type: _selectedDeviceType,
       port: int.parse(_portController.text.trim()),
@@ -99,8 +89,6 @@ class _AddDeviceState extends State<AddDevice> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<VisualizerProvider>(context, listen: false);
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Form(
@@ -253,7 +241,7 @@ class _AddDeviceState extends State<AddDevice> {
               },
             ),
 
-            ElevatedButton(
+            TextButton(
               onPressed: () {
                 setState(() {
                   _segments.add(
@@ -265,32 +253,7 @@ class _AddDeviceState extends State<AddDevice> {
                   );
                 });
               },
-              style: ElevatedButton.styleFrom(
-                fixedSize: const Size(44, 44),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              child: const Icon(Icons.add, size: 24),
-            ),
-            // Effect Dropdown
-            DropdownButtonFormField<LedEffect>(
-              decoration: _inputDecoration("Effect", Icons.style),
-              value: _selectedEffect,
-              items: provider.effects
-                  .map(
-                    (effect) => DropdownMenuItem(
-                      value: effect,
-                      child: Text(effect.name),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => _selectedEffect = val);
-                }
-              },
-              validator: (value) => value == null ? 'Select effect' : null,
+              child: Text("Add new segment"),
             ),
 
             // Device Type Dropdown

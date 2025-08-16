@@ -26,7 +26,7 @@ List<int> renderCenterPulsePacket({
   final double hue = (features.hue % 360) / 360;
   final double beatBoost = features.isBeat ? 1.2 : 1.0;
 
-  for (Segment segment in device.segments ?? []) {
+  for (Segment segment in device.segments) {
     final int count = segment.endIndex - segment.startIndex + 1;
     final double half = count / 2;
     final double spread = rawStrength * half;

@@ -46,7 +46,7 @@ class _HomeState extends State<Home> {
     final devices = _getSortedDevices(provider.devices);
 
     // Sync selected effect with provider if needed
-    _selectedGlobalEffect ??= provider.globalEffectId;
+    _selectedGlobalEffect = provider.globalEffectId;
 
     return Padding(
       padding: const EdgeInsets.all(8.0),
@@ -135,39 +135,18 @@ class _HomeState extends State<Home> {
         color: Colors.redAccent,
         child: const Icon(Icons.delete, color: Colors.white, size: 32),
       ),
-      child: GestureDetector(
-        onTap: () {
-          if (device.type == DeviceType.wiz) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => DeviceControlScreen(device: device),
-              ),
-            );
-          } else {
-            if (Platform.isAndroid || Platform.isIOS) {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => DeviceDetails(device: device),
-                ),
-              );
-            } else {
-              _launchUrl(device);
-            }
-          }
-        },
-        child: Card(
-          elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          child: ExpansionTile(
-            initiallyExpanded: true,
-            leading: const Icon(Icons.lightbulb, size: 16),
-            title: Text(
-              device.name,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            children: [_buildDeviceDetails(context, device, provider)],
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        child: ExpansionTile(
+          initiallyExpanded: true,
+          leading: const Icon(Icons.lightbulb, size: 16),
+          title: Text(
+            device.name,
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
+          children: [_buildDeviceDetails(context, device, provider)],
         ),
       ),
     );
@@ -239,9 +218,9 @@ class _HomeState extends State<Home> {
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: device.segments?.length ?? 0,
+            itemCount: device.segments.length,
             itemBuilder: (context, index) {
-              final segment = device.segments![index];
+              final segment = device.segments[index];
               return ListTile(
                 title: Text('Segment ${index + 1}'),
                 subtitle: Text(
@@ -262,41 +241,10 @@ class _HomeState extends State<Home> {
     LedDevice device,
     VisualizerProvider provider,
   ) {
-    final effects = provider.effects;
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       spacing: 12,
       children: [
-        Expanded(
-          child: DropdownButtonFormField<String>(
-            value: device.effect,
-            decoration: InputDecoration(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-              ),
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                vertical: 12,
-                horizontal: 12,
-              ),
-            ),
-            items: effects
-                .map(
-                  (effect) => DropdownMenuItem(
-                    value: effect.id,
-                    child: Text(effect.name),
-                  ),
-                )
-                .toList(),
-            onChanged: (val) {
-              if (val != null) {
-                provider.deviceActions(
-                  device.copyWith(effect: val),
-                  DeviceAction.update,
-                );
-              }
-            },
-          ),
-        ),
         FilledButton(
           onPressed: () {
             showDialog(
@@ -323,6 +271,29 @@ class _HomeState extends State<Home> {
                 : Icons.play_circle_fill,
             size: 26,
           ),
+        ),
+
+        FilledButton(
+          onPressed: () {
+            if (device.type == DeviceType.wiz) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DeviceControlScreen(device: device),
+                ),
+              );
+            } else {
+              if (Platform.isAndroid || Platform.isIOS) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DeviceDetails(device: device),
+                  ),
+                );
+              } else {
+                _launchUrl(device);
+              }
+            }
+          },
+          child: Icon(Icons.navigate_next, size: 26),
         ),
       ],
     );

@@ -85,7 +85,7 @@ List<int> renderBeatDropEffect({
   final int risingBottomLeds = _currentRisingLedsCount.round();
   final int dropLedPosition = _currentDropLogicalPos.floor();
 
-  for (Segment segment in device.segments ?? []) {
+  for (Segment segment in device.segments) {
     final int count = segment.endIndex - segment.startIndex + 1;
     _currentRisingLedsCount = _currentRisingLedsCount.clamp(
       0.0,

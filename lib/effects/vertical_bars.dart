@@ -9,7 +9,8 @@ List<int> renderVerticalBars({
   required AudioFeatures features,
   required double brightness,
   required double saturation,
-  double gain = 0.0, // NEW PARAMETER
+  double gain = 0.0,
+  required double smooth,
 }) {
   final List<int> packet = [0x02, 0x04];
 
@@ -24,14 +25,12 @@ List<int> renderVerticalBars({
   );
 
   // Smooth the output (EMA)
-  const double smoothFactor = 0.2;
   _previousBarStrength =
-      (_previousBarStrength * (1 - smoothFactor)) +
-      (rawStrength * smoothFactor);
+      (_previousBarStrength * (1 - smooth)) + (rawStrength * smooth);
 
   final double barStrength = _previousBarStrength;
 
-  for (Segment segment in device.segments ?? []) {
+  for (Segment segment in device.segments) {
     final int count = segment.endIndex - segment.startIndex + 1;
     for (int i = 0; i < count; i++) {
       final double pos = (i + 0.5) / count;

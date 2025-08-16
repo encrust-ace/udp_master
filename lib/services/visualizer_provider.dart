@@ -88,6 +88,13 @@ class VisualizerProvider with ChangeNotifier {
           'steps': 10,
           'default': 1.0,
         },
+        'smooth': {
+          'min': 0.0,
+          'max': 1.0,
+          'value': 0.7,
+          'steps': 10,
+          'default': 0.7,
+        },
       },
     ),
     'center-pulse': LedEffect(
@@ -209,14 +216,6 @@ class VisualizerProvider with ChangeNotifier {
     _globalEffectId = effectId;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('globalEffect', effectId);
-
-    // Update all devices to use the new global effect
-    final updatedDevices = _devices
-        .map((d) => d.copyWith(effect: effectId))
-        .toList();
-    _devices = updatedDevices;
-    await _saveDevices();
-
     notifyListeners();
     return true;
   }
@@ -426,46 +425,52 @@ class VisualizerProvider with ChangeNotifier {
     }
   }
 
+  List<int> _getPakcetData(
+    LedDevice device,
+    LedEffect effect,
+    AudioFeatures features,
+  ) {
+    switch (effect.id) {
+      case 'vertical-bars':
+        return renderVerticalBars(
+          device: device,
+          features: features,
+          gain: effect.parameters["gain"]!['value'],
+          brightness: effect.parameters["brightness"]!['value'],
+          saturation: effect.parameters["saturation"]!['value'],
+          smooth: effect.parameters["smooth"]!['value'],
+        );
+      case 'center-pulse':
+        return renderCenterPulsePacket(
+          device: device,
+          features: features,
+          gain: effect.parameters["gain"]!['value'],
+          brightness: effect.parameters["brightness"]!['value'],
+          saturation: effect.parameters["saturation"]!['value'],
+        );
+      case 'music-rhythm':
+        return renderBeatDropEffect(
+          device: device,
+          features: features,
+          gain: effect.parameters["gain"]!['value'],
+          brightness: effect.parameters["brightness"]!['value'],
+          saturation: effect.parameters["saturation"]!['value'],
+          raiseSpeed: effect.parameters["raiseSpeed"]!['value'],
+          decaySpeed: effect.parameters["decaySpeed"]!['value'],
+          dropSpeed: effect.parameters["dropSpeed"]!['value'],
+        );
+      default:
+        return [];
+    }
+  }
+
   void _processAudioData(AudioFeatures features) {
     // Filter out only active devices once to avoid re-filtering in the loop
     final activeDevices = _devices.where((d) => d.isEffectEnabled).toList();
 
     for (final device in activeDevices) {
-      final effect = _effects[device.effect]!;
-      List<int> packetData = [];
-
-      switch (effect.id) {
-        case 'vertical-bars':
-          packetData = renderVerticalBars(
-            device: device,
-            features: features,
-            gain: effect.parameters["gain"]!['value'],
-            brightness: effect.parameters["brightness"]!['value'],
-            saturation: effect.parameters["saturation"]!['value'],
-          );
-          break;
-        case 'center-pulse':
-          packetData = renderCenterPulsePacket(
-            device: device,
-            features: features,
-            gain: effect.parameters["gain"]!['value'],
-            brightness: effect.parameters["brightness"]!['value'],
-            saturation: effect.parameters["saturation"]!['value'],
-          );
-          break;
-        case 'music-rhythm':
-          packetData = renderBeatDropEffect(
-            device: device,
-            features: features,
-            gain: effect.parameters["gain"]!['value'],
-            brightness: effect.parameters["brightness"]!['value'],
-            saturation: effect.parameters["saturation"]!['value'],
-            raiseSpeed: effect.parameters["raiseSpeed"]!['value'],
-            decaySpeed: effect.parameters["decaySpeed"]!['value'],
-            dropSpeed: effect.parameters["dropSpeed"]!['value'],
-          );
-          break;
-      }
+      final effect = _effects[_globalEffectId]!;
+      List<int> packetData = _getPakcetData(device, effect, features);
       if (packetData.isNotEmpty) {
         _udpSender.send(device, packetData);
       }
@@ -484,46 +489,12 @@ class VisualizerProvider with ChangeNotifier {
       ip: '127.0.0.1',
       port: 60,
       ledCount: 90,
-      effect: effect.id,
       isEffectEnabled: true,
       type: DeviceType.wled,
       segments: [Segment(id: 'segment_1', startIndex: 0, endIndex: 89)],
     );
 
-    List<int> packetData = [];
-
-    switch (effect.id) {
-      case 'vertical-bars':
-        packetData = renderVerticalBars(
-          device: simulatedDevice,
-          features: features,
-          gain: effect.parameters["gain"]!['value'],
-          brightness: effect.parameters["brightness"]!['value'],
-          saturation: effect.parameters["saturation"]!['value'],
-        );
-        break;
-      case 'center-pulse':
-        packetData = renderCenterPulsePacket(
-          device: simulatedDevice,
-          features: features,
-          gain: effect.parameters["gain"]!['value'],
-          brightness: effect.parameters["brightness"]!['value'],
-          saturation: effect.parameters["saturation"]!['value'],
-        );
-        break;
-      case 'music-rhythm':
-        packetData = renderBeatDropEffect(
-          device: simulatedDevice,
-          features: features,
-          gain: effect.parameters["gain"]!['value'],
-          brightness: effect.parameters["brightness"]!['value'],
-          saturation: effect.parameters["saturation"]!['value'],
-          raiseSpeed: effect.parameters["raiseSpeed"]!['value'],
-          decaySpeed: effect.parameters["decaySpeed"]!['value'],
-          dropSpeed: effect.parameters["dropSpeed"]!['value'],
-        );
-        break;
-    }
+    List<int> packetData = _getPakcetData(simulatedDevice, effect, features);
 
     if (packetData.isNotEmpty) {
       packets = packetData;
