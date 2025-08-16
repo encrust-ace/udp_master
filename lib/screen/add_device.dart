@@ -217,75 +217,88 @@ class _AddDeviceState extends State<AddDevice> {
               itemCount: _segments.length,
               itemBuilder: (context, index) {
                 return Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    spacing: 12,
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Column(
+                    spacing: 20,
                     children: [
-                      Expanded(
-                        child: TextFormField(
-                          decoration: _inputDecoration(
-                            "Segment ID",
-                            Icons.segment,
-                          ),
-                          initialValue: _segments[index].id,
-                          onChanged: (value) {
-                            setState(() {
-                              _segments[index] = _segments[index].copyWith(
-                                id: value,
-                              );
-                            });
-                          },
-                        ),
-                      ),
-                      Expanded(
-                        child: TextFormField(
-                          decoration: _inputDecoration(
-                            "Start Index",
-                            Icons.arrow_forward,
-                          ),
-                          initialValue: _segments[index].startIndex.toString(),
-                          keyboardType: TextInputType.number,
-                          autovalidateMode: AutovalidateMode.onUserInteraction,
-                          onChanged: (value) {
-                            setState(() {
-                              _segments[index] = _segments[index].copyWith(
-                                startIndex: int.tryParse(value) ?? 0,
-                              );
-                            });
-                          },
-                          validator: (value) =>
-                              indexValidator(index, value, 'start'),
-                        ),
-                      ),
-                      Expanded(
-                        child: TextFormField(
-                          decoration: _inputDecoration(
-                            "End Index",
-                            Icons.arrow_back,
-                          ),
-                          initialValue: _segments[index].endIndex.toString(),
-                          keyboardType: TextInputType.number,
-                          autovalidateMode: AutovalidateMode.onUserInteraction,
-                          onChanged: (value) {
-                            setState(() {
-                              _segments[index] = _segments[index].copyWith(
-                                endIndex: int.tryParse(value) ?? 0,
-                              );
-                            });
-                          },
-                          validator: (value) =>
-                              indexValidator(index, value, 'end'),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete),
-                        onPressed: index != 0
-                            ? () {
+                      Row(
+                        spacing: 16,
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              decoration: _inputDecoration(
+                                "Segment ID",
+                                Icons.segment,
+                              ),
+                              initialValue: _segments[index].id,
+                              onChanged: (value) {
                                 setState(() {
-                                  _segments.removeAt(index);
+                                  _segments[index] = _segments[index].copyWith(
+                                    id: value,
+                                  );
                                 });
-                              }
-                            : null,
+                              },
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete),
+                            onPressed: index != 0
+                                ? () {
+                                    setState(() {
+                                      _segments.removeAt(index);
+                                    });
+                                  }
+                                : null,
+                          ),
+                        ],
+                      ),
+                      Row(
+                        spacing: 16,
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              decoration: _inputDecoration(
+                                "Start Index",
+                                Icons.arrow_forward,
+                              ),
+                              initialValue: _segments[index].startIndex
+                                  .toString(),
+                              keyboardType: TextInputType.number,
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
+                              onChanged: (value) {
+                                setState(() {
+                                  _segments[index] = _segments[index].copyWith(
+                                    startIndex: int.tryParse(value) ?? 0,
+                                  );
+                                });
+                              },
+                              validator: (value) =>
+                                  indexValidator(index, value, 'start'),
+                            ),
+                          ),
+                          Expanded(
+                            child: TextFormField(
+                              decoration: _inputDecoration(
+                                "End Index",
+                                Icons.arrow_back,
+                              ),
+                              initialValue: _segments[index].endIndex.toString(),
+                              keyboardType: TextInputType.number,
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
+                              onChanged: (value) {
+                                setState(() {
+                                  _segments[index] = _segments[index].copyWith(
+                                    endIndex: int.tryParse(value) ?? 0,
+                                  );
+                                });
+                              },
+                              validator: (value) =>
+                                  indexValidator(index, value, 'end'),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
