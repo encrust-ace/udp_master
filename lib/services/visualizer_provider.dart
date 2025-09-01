@@ -360,10 +360,10 @@ class VisualizerProvider with ChangeNotifier {
       return false;
     }
 
-    if (Platform.isLinux) {
-      await _startMicLinux();
-    } else {
+    if (Platform.isAndroid) {
       await _startMicAndroid();
+    } else {
+      await _startMicLinux();
     }
 
     _isRunning = true;
@@ -688,7 +688,7 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   Future<bool> _ensureMicPermission() async {
-    if (!Platform.isAndroid && !Platform.isIOS) return true;
+    // if (!Platform.isAndroid && !Platform.isIOS && !kIsWeb) return true;
     final status = await Permission.microphone.request();
     return status.isGranted;
   }
