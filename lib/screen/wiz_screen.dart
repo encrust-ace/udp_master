@@ -576,7 +576,7 @@ class _DeviceControlScreenState extends State<DeviceControlScreen>
             ),
             const Text('Scenes', style: TextStyle(fontWeight: FontWeight.bold)),
             DropdownButtonFormField<String>(
-              value: scenes.containsKey(_selectedSceneId)
+              initialValue: scenes.containsKey(_selectedSceneId)
                   ? _selectedSceneId.toString()
                   : '2',
               decoration: InputDecoration(

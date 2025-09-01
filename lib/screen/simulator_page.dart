@@ -48,7 +48,7 @@ class _SimulatorPageState extends State<SimulatorPage> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.filter_vintage_outlined),
               ),
-              value: _selectedGlobalEffectId,
+              initialValue: _selectedGlobalEffectId,
               items: provider.effects
                   .map((e) => DropdownMenuItem(value: e.id, child: Text(e.name)))
                   .toList(),

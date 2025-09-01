@@ -82,7 +82,7 @@ class _HomeState extends State<Home> {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.sort),
             ),
-            value: _selectedSortOption,
+            initialValue: _selectedSortOption,
             items: _sortOptions
                 .map(
                   (option) =>
@@ -104,7 +104,7 @@ class _HomeState extends State<Home> {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.filter_vintage_outlined),
             ),
-            value: _selectedGlobalEffect,
+            initialValue: _selectedGlobalEffect,
             items: provider.effects
                 .map((e) => DropdownMenuItem(value: e.id, child: Text(e.name)))
                 .toList(),

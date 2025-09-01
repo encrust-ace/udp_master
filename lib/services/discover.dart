@@ -340,7 +340,7 @@ class _DeviceScanPageState extends State<DeviceScanPage> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: deviceType.name,
+                    initialValue: deviceType.name,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(),
                       contentPadding: const EdgeInsets.all(12),

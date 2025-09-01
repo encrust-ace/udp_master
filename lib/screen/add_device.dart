@@ -324,7 +324,7 @@ class _AddDeviceState extends State<AddDevice> {
             // Device Type Dropdown
             DropdownButtonFormField<DeviceType>(
               decoration: _inputDecoration("Device Type", Icons.device_hub),
-              value: _selectedDeviceType,
+              initialValue: _selectedDeviceType,
               items: DeviceType.values
                   .map(
                     (type) =>

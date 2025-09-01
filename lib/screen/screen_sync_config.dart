@@ -225,7 +225,7 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
               DropdownButtonFormField<DisplayPosition>(
                 isExpanded: true,
                 hint: const Text("Select Side"),
-                value: _availableSides.contains(_selectedSide)
+                initialValue: _availableSides.contains(_selectedSide)
                     ? _selectedSide
                     : null,
                 decoration: InputDecoration(
@@ -253,7 +253,7 @@ class _DisplaySyncConfigPageState extends State<DisplaySyncConfigPage> {
               DropdownButtonFormField<LedDevice>(
                 isExpanded: true,
                 hint: const Text("Select Device"),
-                value: _selectedDevice,
+                initialValue: _selectedDevice,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
