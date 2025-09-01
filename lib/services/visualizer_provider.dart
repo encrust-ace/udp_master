@@ -688,7 +688,7 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   Future<bool> _ensureMicPermission() async {
-    // if (!Platform.isAndroid && !Platform.isIOS && !kIsWeb) return true;
+    if (!Platform.isAndroid && !Platform.isIOS) return true;
     final status = await Permission.microphone.request();
     return status.isGranted;
   }
