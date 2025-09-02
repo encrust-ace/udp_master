@@ -2,35 +2,28 @@ import 'dart:math';
 
 import 'package:udp_master/services/audio_analyzer.dart';
 
-int _colorCycler = 0;
-// Previous filtered pixel values (0..1 floats) used by EMA filter
-List<List<double>> _prevPixels = [];
-
 List<int> renderEnergyBars({
   required int ledCount,
   required AudioFeatures features,
   required double brightness,
   required double saturation,
-  // new configurable parameters (user can pass 0 to use AGC for gain)
-  double gain = 1.0,
+  required double gain,
   // how much to temporally blur the output (0 = no blur, larger = smoother)
   double blur = 4.0,
   // mirror the effect horizontally
   bool mirror = false,
-  // if true, cycle lows/mids/highs colors on beat
-  bool colorCycler = false,
   // user-selected colors for bands as RGB triples [r,g,b] 0..255
   List<int> lowsColor = const [255, 0, 0],
   List<int> midsColor = const [0, 255, 0],
   List<int> highsColor = const [0, 0, 255],
   // responsiveness (0.0..1.0) higher = more responsive
-  double sensitivity = 0.4, 
+  double sensitivity = 0.1, 
   // mixing mode: 'additive' or 'overlap'
   String mixingMode = 'additive',
   // placement: 'bottom', 'top', 'mid', 'edge'
   String placement = 'mid',
 }) {
-  final List<int> packet = [0x02, 0x04];
+  final List<int> packet = [];
 
   // Use AGC if userGain is 0, otherwise use userGain directly
   // Use overall RMS for AGC (avoid biasing to bass)
@@ -64,26 +57,7 @@ List<int> renderEnergyBars({
   final int midsIdx = (multiplier * ledCount * mid).round().clamp(0, ledCount);
   final int highsIdx = (multiplier * ledCount * high).round().clamp(0, ledCount);
 
-  // Color cycler: rotate user-provided colors among bands on beat (if enabled)
-  if (colorCycler && features.isBeat) {
-    _colorCycler = (_colorCycler + 1) % 3;
-    if (_colorCycler == 0) {
-      final tmp = lowsColor;
-      lowsColor = midsColor;
-      midsColor = highsColor;
-      highsColor = tmp;
-    } else if (_colorCycler == 1) {
-      final tmp = lowsColor;
-      lowsColor = highsColor;
-      highsColor = midsColor;
-      midsColor = tmp;
-    } else {
-      // rotate back
-      final tmp = lowsColor;
-      lowsColor = midsColor;
-      midsColor = tmp;
-    }
-  }
+  // (color cycling removed)
   // Convert user RGB colors (0..255) to normalized 0..1 units
   final List<double> lowRgbUnit = lowsColor.map((v) => (v.clamp(0, 255) / 255.0)).toList();
   final List<double> midRgbUnit = midsColor.map((v) => (v.clamp(0, 255) / 255.0)).toList();
@@ -188,47 +162,24 @@ List<int> renderEnergyBars({
   setRange(midsIdx, midRgbUnit, additive: additive);
   setRange(highsIdx, highRgbUnit, additive: additive);
 
-  // Ensure _prevPixels exists and has correct size
-  if (_prevPixels.length != ledCount) {
-    _prevPixels = List.generate(ledCount, (_) => [0.0, 0.0, 0.0]);
-  }
-
-  // Create ledfx-like alpha parameters: rise uses sensitivity, decay scaled from sensitivity
-  final double alphaRise = sensitivity.clamp(0.0, 1.0);
-  final double alphaDecay = ((sensitivity - 0.1) * 0.7).clamp(0.01, 0.99);
-
-  // Apply per-pixel EMA with different alpha for rising vs falling values
-  for (int i = 0; i < ledCount; i++) {
-    for (int c = 0; c < 3; c++) {
-      final double t = target[i][c];
-      final double p = _prevPixels[i][c];
-      final double alpha = t > p ? alphaRise : alphaDecay;
-      _prevPixels[i][c] = (p * (1 - alpha)) + (t * alpha);
-    }
-  }
-
-  // Post-process for vibrance: apply saturation stretch and gamma, then apply user brightness
+  // Instantaneous processing: apply vibrance and gamma directly to `target`
   final double satFactor = (1.0 + saturation).clamp(1.0, 2.5);
   final double gamma = 0.85; // slightly <1 to boost midtones
   for (int i = 0; i < ledCount; i++) {
-    final double r = _prevPixels[i][0];
-    final double g = _prevPixels[i][1];
-    final double b = _prevPixels[i][2];
-    final double mean = (r + g + b) / 3.0;
-    double rn = (mean + (r - mean) * satFactor).clamp(0.0, 1.0);
-    double gn = (mean + (g - mean) * satFactor).clamp(0.0, 1.0);
-    double bn = (mean + (b - mean) * satFactor).clamp(0.0, 1.0);
-    _prevPixels[i][0] = pow(rn, gamma).toDouble() * brightness;
-    _prevPixels[i][1] = pow(gn, gamma).toDouble() * brightness;
-    _prevPixels[i][2] = pow(bn, gamma).toDouble() * brightness;
-  }
-
-  // Convert _prevPixels to packet ints
-  for (int i = 0; i < ledCount; i++) {
-    final r = (_prevPixels[i][0] * 255).round().clamp(0, 255);
-    final g = (_prevPixels[i][1] * 255).round().clamp(0, 255);
-    final b = (_prevPixels[i][2] * 255).round().clamp(0, 255);
-    packet.addAll([r, g, b]);
+    final double r0 = target[i][0];
+    final double g0 = target[i][1];
+    final double b0 = target[i][2];
+    final double mean = (r0 + g0 + b0) / 3.0;
+    double rn = (mean + (r0 - mean) * satFactor).clamp(0.0, 1.0);
+    double gn = (mean + (g0 - mean) * satFactor).clamp(0.0, 1.0);
+    double bn = (mean + (b0 - mean) * satFactor).clamp(0.0, 1.0);
+    final double rf = pow(rn, gamma).toDouble() * brightness;
+    final double gf = pow(gn, gamma).toDouble() * brightness;
+    final double bf = pow(bn, gamma).toDouble() * brightness;
+    final int ri = (rf * 255).round().clamp(0, 255);
+    final int gi = (gf * 255).round().clamp(0, 255);
+    final int bi = (bf * 255).round().clamp(0, 255);
+    packet.addAll([ri, gi, bi]);
   }
 
   // if mirror is enabled, mirror the data to the other half of leds by appending reversed half

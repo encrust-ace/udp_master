@@ -441,7 +441,7 @@ class VisualizerProvider with ChangeNotifier {
     LedEffect effect,
     AudioFeatures features,
   ) {
-    List<int> packetData = [];
+    List<int> packetData = [0x02, 0x04];
 
     for (Segment segment in device.segments) {
       List<int> segmentPacketData = [];
@@ -486,9 +486,8 @@ class VisualizerProvider with ChangeNotifier {
   void _processAudioData(AudioFeatures features) {
     // Filter out only active devices once to avoid re-filtering in the loop
     final activeDevices = _devices.where((d) => d.isEffectEnabled).toList();
-
+    final effect = _effects[_globalEffectId]!;
     for (final device in activeDevices) {
-      final effect = _effects[_globalEffectId]!;
       List<int> packetData = _getPakcetData(device, effect, features);
       if (packetData.isNotEmpty) {
         _udpSender.send(device, packetData);
@@ -496,7 +495,7 @@ class VisualizerProvider with ChangeNotifier {
     }
 
     if (_currentSelectedTab == 2) {
-      _updateSimulatorData(features, _effects[_globalEffectId]!);
+      _updateSimulatorData(features, effect);
     }
   }
 
