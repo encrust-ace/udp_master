@@ -100,20 +100,6 @@ class AudioAnalyzer {
   }
 }
 
-class AutoGainController {
-  double _smoothedEnergy = 0.01;
-  final double target = 0.5;
-  final double smoothing = 0.01;
-
-  double computeGain(double currentEnergy) {
-    _smoothedEnergy =
-        (_smoothedEnergy * (1 - smoothing)) + (currentEnergy * smoothing);
-    return _smoothedEnergy > 0
-        ? (target / _smoothedEnergy).clamp(0.5, 10.0)
-        : 1.0;
-  }
-}
-
 List<int> hsvToRgb(double h, double s, double v) {
   h = h.clamp(0.0, 1.0);
   s = s.clamp(0.0, 1.0);

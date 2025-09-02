@@ -27,7 +27,10 @@ class EffectsPage extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           margin: const EdgeInsets.symmetric(vertical: 8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 18.0),
+            padding: const EdgeInsets.symmetric(
+              vertical: 18.0,
+              horizontal: 18.0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -43,9 +46,8 @@ class EffectsPage extends StatelessWidget {
                     Expanded(
                       child: Text(
                         effect.name,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
                     IconButton(
@@ -61,45 +63,93 @@ class EffectsPage extends StatelessWidget {
                 ...effect.parameters.entries.map((entry) {
                   final key = entry.key;
                   final param = entry.value;
+                  final String dataType = param["type"] ?? "number";
 
-                  final double min = (param["min"] ?? 0.0).toDouble();
-                  final double max = (param["max"] ?? 1.0).toDouble();
-                  final double currentValue = (param["value"] ?? 0.0).toDouble();
-                  final double defaultValue = (param["default"] ?? 0.0).toDouble();
-                  final int steps = (param["steps"] ?? 20).toInt();
+                  if (dataType == "number") {
+                    final double min = (param["min"] ?? 0.0).toDouble();
+                    final double max = (param["max"] ?? 1.0).toDouble();
+                    final double currentValue = (param["value"] ?? 0.0)
+                        .toDouble();
+                    final double defaultValue = (param["default"] ?? 0.0)
+                        .toDouble();
+                    final int steps = (param["steps"] ?? 20).toInt();
 
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Row(
-                      children: [
-                        SizedBox(width: 100, child: Text(key)),
-                        Text(currentValue.toStringAsFixed(2)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Slider(
-                            value: currentValue,
-                            min: min,
-                            max: max,
-                            divisions: steps,
-                            onChanged: (val) {
-                              context.read<VisualizerProvider>().updateEffect(
-                                    effect,
-                                    key,
-                                    {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          SizedBox(width: 100, child: Text(key)),
+                          Text(currentValue.toStringAsFixed(2)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Slider(
+                              value: currentValue,
+                              min: min,
+                              max: max,
+                              divisions: steps,
+                              onChanged: (val) {
+                                context
+                                    .read<VisualizerProvider>()
+                                    .updateEffect(effect, key, {
+                                      "type": dataType,
                                       "min": min,
                                       "max": max,
                                       "value": val,
                                       "steps": steps,
                                       "default": defaultValue,
-                                    },
-                                  );
-                            },
+                                    });
+                              },
+                            ),
                           ),
-                        ),
-                        Text(max.toStringAsFixed(1)),
-                      ],
-                    ),
-                  );
+                          Text(max.toStringAsFixed(1)),
+                        ],
+                      ),
+                    );
+                  } else if (dataType == "option") {
+                     final String defaultValue = (param["default"] ?? "");
+
+                    final List<String> options = List<String>.from(
+                      param["options"] ?? [],
+                    );
+                    final String currentOption =
+                        param["value"] ?? options.first;
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          SizedBox(width: 100, child: Text(key)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: DropdownButton<String>(
+                              value: currentOption,
+                              isExpanded: true,
+                              items: options.map((option) {
+                                return DropdownMenuItem<String>(
+                                  value: option,
+                                  child: Text(option),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  context
+                                      .read<VisualizerProvider>()
+                                      .updateEffect(effect, key, {
+                                        "type": dataType,
+                                        "default": defaultValue,
+                                        "value": val,
+                                        "options": options,
+                                      });
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    return const SizedBox.shrink();
+                  }
                 }),
               ],
             ),

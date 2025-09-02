@@ -3,8 +3,6 @@ import 'package:udp_master/services/audio_analyzer.dart';
 // Enum to define which frequency band (bass, mids, highs) we are listening for beats.
 enum BeatFrequencyBand { bass, mids, highs }
 
-final AutoGainController _beatDropAgc = AutoGainController();
-
 // Variables to track the state of the beat drop effect over time.
 double _currentRisingLedsCount =
     0.0; // How many LEDs are currently "lit up" from the bottom.
@@ -38,11 +36,7 @@ List<int> renderBeatDropEffect({
 
   double rawEnergy = features.bassEnergy;
 
-  final double userOrAutoGain = gain == 0
-      ? _beatDropAgc.computeGain(rawEnergy)
-      : gain;
-
-  double processedEnergy = rawEnergy * userOrAutoGain;
+  double processedEnergy = rawEnergy * gain;
 
   // Faster dynamic gain adjustment
   if (processedEnergy > _targetLoudness) {

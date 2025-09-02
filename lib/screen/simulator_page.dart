@@ -73,7 +73,7 @@ class _SimulatorPageState extends State<SimulatorPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 4.0),
                     child: LedStripSimulator(
                       ledCount: ledsPerStrip,
-                      packet: provider.packets,
+                      packet: provider.simulatorPackets,
                     ),
                   ),
                 );

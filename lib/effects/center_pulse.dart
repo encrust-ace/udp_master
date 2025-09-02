@@ -1,7 +1,5 @@
 import 'package:udp_master/services/audio_analyzer.dart';
 
-final AutoGainController agcCenter = AutoGainController();
-
 List<int> renderCenterPulsePacket({
   required int ledCount,
   required AudioFeatures features,
@@ -11,13 +9,8 @@ List<int> renderCenterPulsePacket({
 }) {
   final List<int> packet = [0x02, 0x02];
 
-  // Auto-gain: use AGC if gain is 0
-  final double effectiveGain = gain == 0.0
-      ? agcCenter.computeGain(features.bassEnergy)
-      : gain;
-
   // Use bassEnergy to determine pulse spread
-  final double rawStrength = (features.bassEnergy * effectiveGain).clamp(
+  final double rawStrength = (features.bassEnergy * gain).clamp(
     0.0,
     1.0,
   );

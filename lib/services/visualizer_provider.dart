@@ -15,7 +15,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp_master/effects/center_pulse.dart';
 import 'package:udp_master/effects/music_rhythm.dart';
-import 'package:udp_master/effects/vertical_bars.dart';
+import 'package:udp_master/effects/energy_bars.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/services/audio_analyzer.dart';
 import 'package:udp_master/services/udp_sender.dart';
@@ -46,7 +46,7 @@ class VisualizerProvider with ChangeNotifier {
   int _currentSelectedTab = 0;
   int get currentSelectedTab => _currentSelectedTab;
 
-  List<int> packets = []; // For internal simulation/debugging display
+  List<int> simulatorPackets = []; // For internal simulation/debugging display
   StreamSubscription? _micSubscription;
 
   // --- Device & Display Side Management ---
@@ -58,23 +58,25 @@ class VisualizerProvider with ChangeNotifier {
       UnmodifiableListView(_displaySides);
 
   // --- Effect Management ---
-  String _globalEffectId = 'vertical-bars';
+  String _globalEffectId = 'energy-bars';
   String get globalEffectId => _globalEffectId;
 
   // Using a map for faster effect lookup by ID
   final Map<String, LedEffect> _effects = {
-    'vertical-bars': LedEffect(
-      id: 'vertical-bars',
-      name: 'Vertical Bars',
+    'energy-bars': LedEffect(
+      id: 'energy-bars',
+      name: 'Energy Bars',
       parameters: {
         'gain': {
-          'min': 0.0,
+          'type': 'number',
+          'min': 0.5,
           'max': 5.0,
-          'value': 0.0,
-          'steps': 10,
-          'default': 0.0,
+          'value': 1.0,
+          'steps': 20,
+          'default': 1.0,
         },
         'brightness': {
+          'type': 'number',
           'min': 0.0,
           'max': 1.0,
           'value': 1.0,
@@ -82,18 +84,18 @@ class VisualizerProvider with ChangeNotifier {
           'default': 1.0,
         },
         'saturation': {
+          'type': 'number',
           'min': 0.0,
           'max': 1.0,
           'value': 1.0,
           'steps': 10,
           'default': 1.0,
         },
-        'smooth': {
-          'min': 0.0,
-          'max': 1.0,
-          'value': 0.7,
-          'steps': 10,
-          'default': 0.7,
+        'position': {
+          'type': 'option',
+          'default': 'bottom',
+          'value': 'bottom',
+          'options': ['bottom', 'mid', 'edge'],
         },
       },
     ),
@@ -102,6 +104,7 @@ class VisualizerProvider with ChangeNotifier {
       name: 'Center Pulse',
       parameters: {
         'gain': {
+          'type': 'number',
           'min': 0.0,
           'max': 5.0,
           'value': 0.0,
@@ -109,6 +112,7 @@ class VisualizerProvider with ChangeNotifier {
           'default': 0.0,
         },
         'brightness': {
+          'type': 'number',
           'min': 0.0,
           'max': 1.0,
           'value': 1.0,
@@ -116,6 +120,7 @@ class VisualizerProvider with ChangeNotifier {
           'default': 1.0,
         },
         'saturation': {
+          'type': 'number',
           'min': 0.0,
           'max': 1.0,
           'value': 1.0,
@@ -129,13 +134,15 @@ class VisualizerProvider with ChangeNotifier {
       name: 'Music Rhythm',
       parameters: {
         'gain': {
-          'min': 0.0,
+          'type': 'number',
+          'min': 0.5,
           'max': 5.0,
-          'value': 0.0,
-          'steps': 10,
-          'default': 0.0,
+          'value': 0.5,
+          'steps': 20,
+          'default': 1.0,
         },
         'brightness': {
+          'type': 'number',
           'min': 0.0,
           'max': 1.0,
           'value': 1.0,
@@ -143,6 +150,7 @@ class VisualizerProvider with ChangeNotifier {
           'default': 1.0,
         },
         'saturation': {
+          'type': 'number',
           'min': 0.0,
           'max': 1.0,
           'value': 1.0,
@@ -150,6 +158,7 @@ class VisualizerProvider with ChangeNotifier {
           'default': 1.0,
         },
         'raiseSpeed': {
+          'type': 'number',
           'min': 5.0,
           'max': 30.0,
           'value': 10.0,
@@ -157,6 +166,7 @@ class VisualizerProvider with ChangeNotifier {
           'default': 10.0,
         },
         'decaySpeed': {
+          'type': 'number',
           'min': 0.3,
           'max': 1.0,
           'value': 0.5,
@@ -164,6 +174,7 @@ class VisualizerProvider with ChangeNotifier {
           'default': 0.5,
         },
         'dropSpeed': {
+          'type': 'number',
           'min': 0.1,
           'max': 1.0,
           'value': 0.5,
@@ -363,7 +374,7 @@ class VisualizerProvider with ChangeNotifier {
     if (Platform.isAndroid) {
       await _startMicAndroid();
     } else {
-      await _startMicLinux();
+      await _startMicCapture();
     }
 
     _isRunning = true;
@@ -373,13 +384,13 @@ class VisualizerProvider with ChangeNotifier {
 
   Future<void> _stopVisualizer() async {
     if (!_isRunning) return;
-    if (Platform.isLinux) {
-      _recorder.stopStreamingData();
-      _recorder.deinit();
-    } else {
+    if (Platform.isAndroid) {
       await _micSubscription?.cancel();
       _micSubscription = null;
       await _platform.invokeMethod("stopMic");
+    } else {
+      _recorder.stopStreamingData();
+      _recorder.deinit();
     }
     _isRunning = false;
     notifyListeners();
@@ -406,7 +417,7 @@ class VisualizerProvider with ChangeNotifier {
     );
   }
 
-  Future<void> _startMicLinux() async {
+  Future<void> _startMicCapture() async {
     try {
       await _recorder.init(
         format: PCMFormat.f32le,
@@ -434,20 +445,20 @@ class VisualizerProvider with ChangeNotifier {
 
     for (Segment segment in device.segments) {
       List<int> segmentPacketData = [];
+      final int segmentLedCount = (segment.endIndex - segment.startIndex) + 1;
 
       switch (effect.id) {
-        case 'vertical-bars':
-          segmentPacketData = renderVerticalBars(
-            ledCount: segment.endIndex - segment.startIndex,
+        case 'energy-bars':
+          segmentPacketData = renderEnergyBars(
+            ledCount: segmentLedCount,
             features: features,
             gain: effect.parameters["gain"]!['value'],
             brightness: effect.parameters["brightness"]!['value'],
             saturation: effect.parameters["saturation"]!['value'],
-            smooth: effect.parameters["smooth"]!['value'],
           );
         case 'center-pulse':
           segmentPacketData = renderCenterPulsePacket(
-            ledCount: segment.endIndex - segment.startIndex,
+            ledCount: segmentLedCount,
             features: features,
             gain: effect.parameters["gain"]!['value'],
             brightness: effect.parameters["brightness"]!['value'],
@@ -455,7 +466,7 @@ class VisualizerProvider with ChangeNotifier {
           );
         case 'music-rhythm':
           segmentPacketData = renderBeatDropEffect(
-            ledCount: segment.endIndex - segment.startIndex,
+            ledCount: segmentLedCount,
             features: features,
             gain: effect.parameters["gain"]!['value'],
             brightness: effect.parameters["brightness"]!['value'],
@@ -505,7 +516,7 @@ class VisualizerProvider with ChangeNotifier {
     List<int> packetData = _getPakcetData(simulatedDevice, effect, features);
 
     if (packetData.isNotEmpty) {
-      packets = packetData;
+      simulatorPackets = packetData;
       notifyListeners();
     }
   }
