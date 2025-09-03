@@ -2,15 +2,12 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_recorder/flutter_recorder.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp_master/effects/center_pulse.dart';
@@ -190,11 +187,6 @@ class VisualizerProvider with ChangeNotifier {
 
   LedEffect getEffectById(String id) => _effects[id] ?? _effects.values.first;
 
-  // --- Screen Sync Properties ---
-  GlobalKey? _videoKey;
-  MediaStream? _screenStream;
-  Timer? _screenTimer;
-
   // ----------------------------------------------------------------------
   // --- Public Methods ---
   // ----------------------------------------------------------------------
@@ -233,29 +225,6 @@ class VisualizerProvider with ChangeNotifier {
 
   Future<void> toggleVisualizer() async {
     _isRunning ? await _stopVisualizer() : await _startVisualizer();
-  }
-
-  Future<bool> startScreenSync(MediaStream stream, GlobalKey key) async {
-    if (_isRunning) return false;
-    _screenStream = stream;
-    _videoKey = key;
-    _isRunning = true;
-    _screenTimer?.cancel();
-    _screenTimer = Timer.periodic(const Duration(milliseconds: 50), (_) async {
-      await _processFrameAndSend();
-    });
-    notifyListeners();
-    return true;
-  }
-
-  Future<void> stopScreenSync() async {
-    if (!_isRunning) return;
-    _screenTimer?.cancel();
-    _screenTimer = null;
-    _isRunning = false;
-    await _screenStream?.dispose();
-    _screenStream = null;
-    notifyListeners();
   }
 
   // --- Device Actions ---
@@ -519,108 +488,6 @@ class VisualizerProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-
-  // --- Screen Sync Logic ---
-
-  Future<void> _processFrameAndSend() async {
-    if (_videoKey?.currentContext == null || _displaySides.isEmpty) return;
-
-    try {
-      final boundary =
-          _videoKey!.currentContext!.findRenderObject()
-              as RenderRepaintBoundary;
-      final image = await boundary.toImage();
-      final byteData = await image.toByteData(
-        format: ui.ImageByteFormat.rawRgba,
-      );
-      if (byteData == null) return;
-
-      final pixelData = byteData.buffer.asUint8List();
-      final width = image.width;
-      final height = image.height;
-
-      // Process and send data for all sides in a single loop
-      for (final side in _displaySides) {
-        final device = side.device;
-        if (device == null) continue;
-
-        final packetData = _renderScreenData(
-          device: device,
-          pixelData: pixelData,
-          width: width,
-          height: height,
-          side: side.position,
-          startIndex: side.startIndex,
-          endIndex: side.endIndex,
-        );
-        if (packetData.isNotEmpty) {
-          _udpSender.send(device, packetData);
-        }
-      }
-      image.dispose();
-    } catch (e) {
-      if (kDebugMode) print("Error processing frame: $e");
-    }
-  }
-
-  List<int> _renderScreenData({
-    required LedDevice device,
-    required Uint8List pixelData,
-    required int width,
-    required int height,
-    required DisplayPosition side,
-    required int startIndex,
-    required int endIndex,
-  }) {
-    final List<int> packet = [0x02, 0x04];
-    final int sideLedCount = endIndex - startIndex + 1;
-    if (sideLedCount <= 0) return [];
-
-    // Pre-calculate constants outside the loop
-    final int sectionThickness =
-        (side == DisplayPosition.left || side == DisplayPosition.right)
-        ? (width * 0.1).round()
-        : (height * 0.1).round();
-    final double step = 1.0 / (sideLedCount > 1 ? (sideLedCount - 1) : 1);
-
-    for (int i = 0; i < sideLedCount; i++) {
-      double t = i * step;
-      int x, y;
-
-      switch (side) {
-        case DisplayPosition.left:
-          x = sectionThickness ~/ 2;
-          y = height - (t * height).round().clamp(0, height - 1);
-          break;
-        case DisplayPosition.top:
-          x = (t * width).round().clamp(0, width - 1);
-          y = sectionThickness ~/ 2;
-          break;
-        case DisplayPosition.right:
-          x = width - (sectionThickness ~/ 2);
-          y = height - (t * height).round().clamp(0, height - 1);
-          break;
-        case DisplayPosition.bottom:
-          x = (t * width).round().clamp(0, width - 1);
-          y = height - (sectionThickness ~/ 2);
-          break;
-      }
-
-      final int pixelIndex = (y * width + x) * 4;
-
-      if (pixelIndex >= 0 && pixelIndex + 3 < pixelData.length) {
-        packet.addAll([
-          pixelData[pixelIndex],
-          pixelData[pixelIndex + 1],
-          pixelData[pixelIndex + 2],
-        ]);
-      } else {
-        packet.addAll([0, 0, 0]);
-      }
-    }
-    return packet;
-  }
-
   // --- Persistence & Permissions ---
 
   Future<void> _saveDevices() async {

@@ -3,9 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:udp_master/screen/effects.dart';
 import 'package:udp_master/screen/home.dart';
-import 'package:udp_master/screen/screen_sync_config.dart';
 import 'package:udp_master/screen/simulator_page.dart';
-import 'package:udp_master/screen/screen_capture.dart';
 import 'package:udp_master/services/discover.dart';
 import 'services/visualizer_provider.dart';
 
@@ -66,22 +64,6 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
                 isRunning ? Icons.pause_circle : Icons.play_arrow_rounded,
                 size: 28,
               ),
-            ),
-          ),
-          Selector<VisualizerProvider, bool>(
-            selector: (_, p) => p.isRunning,
-            builder: (_, isRunning, __) => IconButton(
-              onPressed: isRunning
-                  ? null
-                  : () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ScreenCapturePage(),
-                        ),
-                      );
-                    },
-              icon: const Icon(Icons.video_call),
             ),
           ),
           IconButton(
@@ -148,7 +130,6 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
               Home(),
               EffectsPage(),
               SimulatorPage(),
-              DisplaySyncConfigPage(),
             ],
           );
         },
