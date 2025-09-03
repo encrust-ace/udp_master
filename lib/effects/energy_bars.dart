@@ -1,3 +1,4 @@
+// energy_bars.dart
 import 'dart:math';
 
 import 'package:udp_master/services/audio_analyzer.dart';

@@ -1,3 +1,5 @@
+// visualizer_provider.dart
+
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
@@ -11,7 +13,6 @@ import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp_master/effects/center_pulse.dart';
-import 'package:udp_master/effects/music_rhythm.dart';
 import 'package:udp_master/effects/energy_bars.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/services/audio_analyzer.dart';
@@ -49,10 +50,6 @@ class VisualizerProvider with ChangeNotifier {
   // --- Device & Display Side Management ---
   List<LedDevice> _devices = [];
   UnmodifiableListView<LedDevice> get devices => UnmodifiableListView(_devices);
-
-  List<DisplaySide> _displaySides = [];
-  UnmodifiableListView<DisplaySide> get displaySides =>
-      UnmodifiableListView(_displaySides);
 
   // --- Effect Management ---
   String _globalEffectId = 'energy-bars';
@@ -126,60 +123,6 @@ class VisualizerProvider with ChangeNotifier {
         },
       },
     ),
-    'music-rhythm': LedEffect(
-      id: 'music-rhythm',
-      name: 'Music Rhythm',
-      parameters: {
-        'gain': {
-          'type': 'number',
-          'min': 0.5,
-          'max': 5.0,
-          'value': 0.5,
-          'steps': 20,
-          'default': 1.0,
-        },
-        'brightness': {
-          'type': 'number',
-          'min': 0.0,
-          'max': 1.0,
-          'value': 1.0,
-          'steps': 10,
-          'default': 1.0,
-        },
-        'saturation': {
-          'type': 'number',
-          'min': 0.0,
-          'max': 1.0,
-          'value': 1.0,
-          'steps': 10,
-          'default': 1.0,
-        },
-        'raiseSpeed': {
-          'type': 'number',
-          'min': 5.0,
-          'max': 30.0,
-          'value': 10.0,
-          'steps': 10,
-          'default': 10.0,
-        },
-        'decaySpeed': {
-          'type': 'number',
-          'min': 0.3,
-          'max': 1.0,
-          'value': 0.5,
-          'steps': 7,
-          'default': 0.5,
-        },
-        'dropSpeed': {
-          'type': 'number',
-          'min': 0.1,
-          'max': 1.0,
-          'value': 0.5,
-          'steps': 9,
-          'default': 0.5,
-        },
-      },
-    ),
   };
 
   UnmodifiableListView<LedEffect> get effects =>
@@ -197,7 +140,6 @@ class VisualizerProvider with ChangeNotifier {
     // Restore data from SharedPreferences
     await _restoreDevices(prefs);
     await _restoreEffects(prefs);
-    await _restoreDisplaySides(prefs);
 
     _currentSelectedTab = prefs.getInt('currentSelectedTab') ?? 0;
     _globalEffectId = prefs.getString('globalEffect') ?? _effects.keys.first;
@@ -312,19 +254,6 @@ class VisualizerProvider with ChangeNotifier {
     return true;
   }
 
-  // --- Display Side Actions ---
-  Future<bool> addOrUpdateDisplaySide(DisplaySide side) async {
-    final index = _displaySides.indexWhere((s) => s.position == side.position);
-    if (index != -1) {
-      _displaySides[index] = side;
-    } else {
-      _displaySides.add(side);
-    }
-    await _saveDisplaySides();
-    notifyListeners();
-    return true;
-  }
-
   // ----------------------------------------------------------------------
   // --- Private Methods ---
   // ----------------------------------------------------------------------
@@ -433,17 +362,6 @@ class VisualizerProvider with ChangeNotifier {
             brightness: effect.parameters["brightness"]!['value'],
             saturation: effect.parameters["saturation"]!['value'],
           );
-        case 'music-rhythm':
-          segmentPacketData = renderBeatDropEffect(
-            ledCount: segmentLedCount,
-            features: features,
-            gain: effect.parameters["gain"]!['value'],
-            brightness: effect.parameters["brightness"]!['value'],
-            saturation: effect.parameters["saturation"]!['value'],
-            raiseSpeed: effect.parameters["raiseSpeed"]!['value'],
-            decaySpeed: effect.parameters["decaySpeed"]!['value'],
-            dropSpeed: effect.parameters["dropSpeed"]!['value'],
-          );
       }
       if (segmentPacketData.isNotEmpty) {
         packetData.addAll(segmentPacketData);
@@ -506,13 +424,6 @@ class VisualizerProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _saveDisplaySides() async {
-    final prefs = await SharedPreferences.getInstance();
-    final sideList = _displaySides.map((s) => json.encode(s.toJson())).toList();
-    await prefs.setStringList('displaySides', sideList);
-    notifyListeners();
-  }
-
   Future<void> _restoreDevices(SharedPreferences prefs) async {
     final deviceList = prefs.getStringList('devices') ?? [];
     _devices = deviceList
@@ -555,13 +466,6 @@ class VisualizerProvider with ChangeNotifier {
         }
       }
     }
-  }
-
-  Future<void> _restoreDisplaySides(SharedPreferences prefs) async {
-    final displaySideList = prefs.getStringList('displaySides') ?? [];
-    _displaySides = displaySideList
-        .map((e) => DisplaySide.fromJson(json.decode(e)))
-        .toList();
   }
 
   Future<bool> _ensureMicPermission() async {

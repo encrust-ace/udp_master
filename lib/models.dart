@@ -1,3 +1,4 @@
+// models.dart
 enum DeviceAction { add, update, delete }
 
 enum DeviceType {
@@ -159,51 +160,6 @@ class LedEffect {
       id: id ?? this.id,
       name: name ?? this.name,
       parameters: parameters ?? this.parameters,
-    );
-  }
-}
-
-enum DisplayPosition { left, right, top, bottom }
-
-class DisplaySide {
-  final DisplayPosition position;
-  final LedDevice? device;
-  final int startIndex;
-  final int endIndex;
-
-  DisplaySide({
-    required this.position,
-    this.device,
-    required this.startIndex,
-    required this.endIndex,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'position': position.name,
-    'device': device?.toJson(),
-    'startIndex': startIndex,
-    'endIndex': endIndex,
-  };
-
-  factory DisplaySide.fromJson(Map<String, dynamic> json) {
-    return DisplaySide(
-      position: DisplayPosition.values.firstWhere(
-        (e) => e.name == json['position'],
-      ),
-      device: json['device'] != null
-          ? LedDevice.fromJson(json['device'] as Map<String, dynamic>)
-          : null,
-      startIndex: json['startIndex'] as int,
-      endIndex: json['endIndex'] as int,
-    );
-  }
-
-  DisplaySide copyWith({LedDevice? device, int? startIndex, int? endIndex}) {
-    return DisplaySide(
-      position: position,
-      device: device ?? this.device,
-      startIndex: startIndex ?? this.startIndex,
-      endIndex: endIndex ?? this.endIndex,
     );
   }
 }

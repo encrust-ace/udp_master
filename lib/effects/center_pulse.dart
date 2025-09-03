@@ -7,7 +7,7 @@ List<int> renderCenterPulsePacket({
   required double saturation,
   required double brightness,
 }) {
-  final List<int> packet = [0x02, 0x02];
+  final List<int> packet = [];
 
   // Use bassEnergy to determine pulse spread
   final double rawStrength = (features.bassEnergy * gain).clamp(
