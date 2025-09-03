@@ -112,11 +112,6 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
               icon: Icon(Icons.strikethrough_s_sharp),
               label: "Simulator",
             ),
-            NavigationDestination(
-              selectedIcon: Icon(Icons.sync),
-              icon: Icon(Icons.sync_outlined),
-              label: "Screen Sync",
-            ),
           ],
         ),
       ),
@@ -126,11 +121,7 @@ class _VisualizerScreenState extends State<VisualizerScreen> {
         builder: (context, selectedIndex, _) {
           return IndexedStack(
             index: selectedIndex,
-            children: [
-              Home(),
-              EffectsPage(),
-              SimulatorPage(),
-            ],
+            children: [Home(), EffectsPage(), SimulatorPage()],
           );
         },
       ),

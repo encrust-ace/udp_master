@@ -12,8 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:udp_master/effects/center_pulse.dart';
-import 'package:udp_master/effects/energy_bars.dart';
+import 'package:udp_master/effects/energy.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/services/audio_analyzer.dart';
 import 'package:udp_master/services/udp_sender.dart';
@@ -52,14 +51,14 @@ class VisualizerProvider with ChangeNotifier {
   UnmodifiableListView<LedDevice> get devices => UnmodifiableListView(_devices);
 
   // --- Effect Management ---
-  String _globalEffectId = 'energy-bars';
+  String _globalEffectId = 'energy';
   String get globalEffectId => _globalEffectId;
 
   // Using a map for faster effect lookup by ID
   final Map<String, LedEffect> _effects = {
-    'energy-bars': LedEffect(
-      id: 'energy-bars',
-      name: 'Energy Bars',
+    'energy': LedEffect(
+      id: 'energy',
+      name: 'Energy',
       parameters: {
         'gain': {
           'type': 'number',
@@ -90,36 +89,6 @@ class VisualizerProvider with ChangeNotifier {
           'default': 'bottom',
           'value': 'bottom',
           'options': ['bottom', 'mid', 'edge'],
-        },
-      },
-    ),
-    'center-pulse': LedEffect(
-      id: 'center-pulse',
-      name: 'Center Pulse',
-      parameters: {
-        'gain': {
-          'type': 'number',
-          'min': 0.0,
-          'max': 5.0,
-          'value': 0.0,
-          'steps': 10,
-          'default': 0.0,
-        },
-        'brightness': {
-          'type': 'number',
-          'min': 0.0,
-          'max': 1.0,
-          'value': 1.0,
-          'steps': 10,
-          'default': 1.0,
-        },
-        'saturation': {
-          'type': 'number',
-          'min': 0.0,
-          'max': 1.0,
-          'value': 1.0,
-          'steps': 10,
-          'default': 1.0,
         },
       },
     ),
@@ -290,6 +259,7 @@ class VisualizerProvider with ChangeNotifier {
       _recorder.stopStreamingData();
       _recorder.deinit();
     }
+    simulatorPackets = [];
     _isRunning = false;
     notifyListeners();
   }
@@ -316,23 +286,40 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   Future<void> _startMicCapture() async {
+
     try {
-      await _recorder.init(
+ await _recorder.init(
         format: PCMFormat.f32le,
         sampleRate: 44100,
         channels: RecorderChannels.mono,
       );
-      _recorder.setFftSmoothing(0.05);
       _recorder.start();
       _recorder.startStreamingData();
       _micSubscription = _recorder.uint8ListStream.listen((_) {
         if (!_isRunning || _devices.isEmpty) return;
         _processAudioData(_audioAnalyzer.analyze(_recorder.getFft()));
-      });
+       });
     } catch (e) {
       if (kDebugMode) print("Linux mic error: $e");
     }
   }
+
+    void _processAudioData(AudioFeatures features) {
+    // Filter out only active devices once to avoid re-filtering in the loop
+    final activeDevices = _devices.where((d) => d.isEffectEnabled).toList();
+    final effect = _effects[_globalEffectId]!;
+    for (final device in activeDevices) {
+      List<int> packetData = _getPakcetData(device, effect, features);
+      if (packetData.isNotEmpty) {
+        _udpSender.send(device, packetData);
+      }
+    }
+
+    if (_currentSelectedTab == 2) {
+      _updateSimulatorData(features, effect);
+    }
+  }
+
 
   List<int> _getPakcetData(
     LedDevice device,
@@ -347,15 +334,7 @@ class VisualizerProvider with ChangeNotifier {
 
       switch (effect.id) {
         case 'energy-bars':
-          segmentPacketData = renderEnergyBars(
-            ledCount: segmentLedCount,
-            features: features,
-            gain: effect.parameters["gain"]!['value'],
-            brightness: effect.parameters["brightness"]!['value'],
-            saturation: effect.parameters["saturation"]!['value'],
-          );
-        case 'center-pulse':
-          segmentPacketData = renderCenterPulsePacket(
+          segmentPacketData = renderEnergyEffect(
             ledCount: segmentLedCount,
             features: features,
             gain: effect.parameters["gain"]!['value'],
@@ -368,22 +347,6 @@ class VisualizerProvider with ChangeNotifier {
       }
     }
     return packetData;
-  }
-
-  void _processAudioData(AudioFeatures features) {
-    // Filter out only active devices once to avoid re-filtering in the loop
-    final activeDevices = _devices.where((d) => d.isEffectEnabled).toList();
-    final effect = _effects[_globalEffectId]!;
-    for (final device in activeDevices) {
-      List<int> packetData = _getPakcetData(device, effect, features);
-      if (packetData.isNotEmpty) {
-        _udpSender.send(device, packetData);
-      }
-    }
-
-    if (_currentSelectedTab == 2) {
-      _updateSimulatorData(features, effect);
-    }
   }
 
   void _updateSimulatorData(AudioFeatures features, LedEffect effect) {

@@ -1,149 +1,80 @@
-// audio_analyzer.dart
 import 'dart:math';
 import 'dart:typed_data';
 
 class AudioFeatures {
-  final double rms;
-  final double dominantFrequency;
-  final double subEnergy;
-  final double bassEnergy;
-  final double midEnergy;
-  final double highEnergy;
-  final double hue;
-  final bool isBeat;
-
+  final double sub;
+  final double bass;
+  final double mid;
+  final double high;
+  final double overall;
   AudioFeatures({
-    required this.rms,
-    required this.dominantFrequency,
-    required this.subEnergy,
-    required this.bassEnergy,
-    required this.midEnergy,
-    required this.highEnergy,
-    required this.hue,
-    required this.isBeat,
+    required this.sub,
+    required this.bass,
+    required this.mid,
+    required this.high,
+    required this.overall,
   });
 }
 
+/// LedFx-style analyzer with filterbanks, smoothing & decay
 class AudioAnalyzer {
   final int sampleRate;
   final int fftSize;
-  double _previousEnergy = 0;
-  int _beatCooldown = 0;
 
-  AudioAnalyzer({this.sampleRate = 44100, this.fftSize = 1024});
+  // smoothing parameters
+  final double smoothing;
+  final double decay;
+
+  // persistent state
+  double _sub = 0, _bass = 0, _mid = 0, _high = 0;
+
+  AudioAnalyzer({
+    this.sampleRate = 44100,
+    this.fftSize = 1024,
+    this.smoothing = 0.5,
+    this.decay = 0.02,
+  });
 
   AudioFeatures analyze(Float32List fft) {
-    final int binCount = fft.length;
-    final double binFreq = sampleRate / (2 * binCount);
+    int n = fft.length;
+    double binHz = sampleRate / (2 * n);
 
-    double maxAmplitude = 0;
-    int maxIndex = 0;
-    double sumSquares = 0;
+    double subNow = 0, bassNow = 0, midNow = 0, highNow = 0;
 
-    double sub = 0, bass = 0, mid = 0, high = 0;
-    double energySum = 0, energyWeightedSum = 0;
+    for (int i = 0; i < n; i++) {
+      double f = i * binHz;
+      double mag = fft[i].abs();
 
-    for (int i = 0; i < binCount; i++) {
-      double amplitude = fft[i];
-      double freq = i * binFreq;
-      double square = amplitude * amplitude;
-
-      sumSquares += square;
-      energySum += square;
-      energyWeightedSum += square * freq;
-
-      if (amplitude > maxAmplitude) {
-        maxAmplitude = amplitude;
-        maxIndex = i;
-      }
-
-      if (freq < 60) {
-        sub += square;
-      } else if (freq < 250) {
-        bass += square;
-      } else if (freq < 2000) {
-        mid += square;
+      if (f < 60) {
+        subNow += mag;
+      } else if (f < 250) {
+        bassNow += mag;
+      } else if (f < 2000) {
+        midNow += mag;
       } else {
-        high += square;
+        highNow += mag;
       }
     }
 
-    final double rms = sqrt(sumSquares / binCount);
-    final double dominantFrequency = maxIndex * binFreq;
+    // exponential smoothing + decay
+    _sub = _smoothAndDecay(_sub, subNow);
+    _bass = _smoothAndDecay(_bass, bassNow);
+    _mid = _smoothAndDecay(_mid, midNow);
+    _high = _smoothAndDecay(_high, highNow);
 
-    // Simple beat detection based on energy difference
-    final double energy = sumSquares;
-    bool isBeat = false;
-    if (_beatCooldown <= 0 && energy > (_previousEnergy * 1.5)) {
-      isBeat = true;
-      _beatCooldown = 6; // prevent false positives (about 60–100 ms)
-    } else {
-      _beatCooldown = max(0, _beatCooldown - 1);
-    }
-    _previousEnergy = energy;
-
-    // Hue based on frequency center of energy
-    final double centerFreq = energySum == 0
-        ? 0
-        : energyWeightedSum / energySum;
-    final double hue = ((centerFreq / (sampleRate / 2)) * 360) % 360;
+    double overall = _sub + _bass + _mid + _high;
 
     return AudioFeatures(
-      rms: rms,
-      dominantFrequency: dominantFrequency,
-      subEnergy: sub,
-      bassEnergy: bass,
-      midEnergy: mid,
-      highEnergy: high,
-      hue: hue,
-      isBeat: isBeat,
+      sub: _sub,
+      bass: _bass,
+      mid: _mid,
+      high: _high,
+      overall: overall,
     );
   }
-}
 
-List<int> hsvToRgb(double h, double s, double v) {
-  h = h.clamp(0.0, 1.0);
-  s = s.clamp(0.0, 1.0);
-  v = v.clamp(0.0, 1.0);
-  int i = (h * 6).floor();
-  double f = h * 6 - i;
-  double p = v * (1 - s);
-  double q = v * (1 - f * s);
-  double t = v * (1 - (1 - f) * s);
-  double r, g, b;
-  switch (i % 6) {
-    case 0:
-      r = v;
-      g = t;
-      b = p;
-      break;
-    case 1:
-      r = q;
-      g = v;
-      b = p;
-      break;
-    case 2:
-      r = p;
-      g = v;
-      b = t;
-      break;
-    case 3:
-      r = p;
-      g = q;
-      b = v;
-      break;
-    case 4:
-      r = t;
-      g = p;
-      b = v;
-      break;
-    case 5:
-      r = v;
-      g = p;
-      b = q;
-      break;
-    default:
-      r = g = b = 0;
+  double _smoothAndDecay(double prev, double current) {
+    double decayed = prev * (1 - decay);
+    return max(current, decayed) * smoothing + current * (1 - smoothing);
   }
-  return [(r * 255).round(), (g * 255).round(), (b * 255).round()];
 }
