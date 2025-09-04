@@ -1,59 +1,147 @@
-import 'dart:math';
-import '../services/audio_analyzer.dart';
+import 'dart:math' as math;
 
-/// Render energy bars similar to LedFx `energy.py`
-List<int> renderEnergyEffect({
-  required int ledCount,
-  required AudioFeatures features,
-  double gain = 1.0,
-  double brightness = 1.0,
-  double saturation = 1.0,
-  bool mirror = false,
-}) {
-  List<int> packet = [];
+/// Dart version of LedFx "EnergyAudioEffect"
+class EnergyAudioEffect {
+  final int ledCount;
+  final double blur; // 0..10
+  final bool mirror;
+  final bool colorCyclerEnabled;
+  final String mixingMode; // "additive" or "overlap"
 
-  // AGC-like normalization
-  double total = features.overall > 0 ? features.overall : 1;
+  final List<double> _pFilterAlphaRise;
+  final List<double> _pFilterAlphaDecay;
+  final math.Random _rng = math.Random();
 
-  // log scaling for perception
-  double bass = log(1 + features.bass * gain) / log(1 + total);
-  double mid = log(1 + features.mid * gain) / log(1 + total);
-  double high = log(1 + features.high * gain) / log(1 + total);
+  // Color state
+  List<double> lowsColor;
+  List<double> midsColor;
+  List<double> highsColor;
 
-  int bassCount = (bass * ledCount).clamp(0, ledCount).round();
-  int midCount = (mid * ledCount).clamp(0, ledCount).round();
-  int highCount = (high * ledCount).clamp(0, ledCount).round();
+  // Pixel buffers
+  late List<List<double>> pixels;
+  late List<List<double>> _prevPixels;
 
-  // LED buffer [r,g,b] per LED
-  List<List<double>> leds =
-      List.generate(ledCount, (_) => [0.0, 0.0, 0.0]);
+  int colorCycler = 0;
 
-  for (int i = 0; i < bassCount && i < ledCount; i++) {
-    leds[i] = [1.0, 0.0, 0.0]; // red
-  }
-  for (int i = 0; i < midCount && i < ledCount; i++) {
-    leds[i] = [0.0, 1.0, 0.0]; // green
-  }
-  for (int i = 0; i < highCount && i < ledCount; i++) {
-    leds[i] = [0.0, 0.0, 1.0]; // blue
-  }
-
-  // apply brightness & saturation
-  for (var rgb in leds) {
-    double r = pow(rgb[0], 0.8) * brightness;
-    double g = pow(rgb[1], 0.8) * brightness;
-    double b = pow(rgb[2], 0.8) * brightness;
-    packet.addAll([
-      (r * 255).round().clamp(0, 255),
-      (g * 255).round().clamp(0, 255),
-      (b * 255).round().clamp(0, 255),
-    ]);
+  EnergyAudioEffect({
+    required this.ledCount,
+    this.blur = 4.0,
+    this.mirror = true,
+    this.colorCyclerEnabled = false,
+    this.mixingMode = "additive",
+    List<int>? colorLows,
+    List<int>? colorMids,
+    List<int>? colorHigh,
+    double sensitivity = 0.6,
+  })  : lowsColor = colorLows?.map((c) => c.toDouble()).toList() ?? [255, 0, 0],
+        midsColor = colorMids?.map((c) => c.toDouble()).toList() ?? [0, 255, 0],
+        highsColor = colorHigh?.map((c) => c.toDouble()).toList() ?? [0, 0, 255],
+        _pFilterAlphaRise = List.filled(ledCount, sensitivity),
+        _pFilterAlphaDecay = List.filled(ledCount, (sensitivity - 0.1) * 0.7) {
+    pixels = List.generate(ledCount, (_) => [0.0, 0.0, 0.0]);
+    _prevPixels = List.generate(ledCount, (_) => [0.0, 0.0, 0.0]);
   }
 
-  // optional mirror
-  if (mirror) {
-    packet.addAll(packet.reversed);
+  /// Optional color cycling on beat
+  void updateColorsOnBeat() {
+    if (!colorCyclerEnabled) return;
+
+    colorCycler = (colorCycler + 1) % 3;
+    final randColor = [
+      _rng.nextInt(256).toDouble(),
+      _rng.nextInt(256).toDouble(),
+      _rng.nextInt(256).toDouble(),
+    ];
+
+    if (colorCycler == 0) {
+      lowsColor = randColor;
+    } else if (colorCycler == 1) {
+      midsColor = randColor;
+    } else {
+      highsColor = randColor;
+    }
   }
 
-  return packet;
+  /// Render frame
+  List<int> frame({
+    required bool beatNow,
+    required double lows, // 0..1
+    required double mids,
+    required double highs,
+  }) {
+    if (beatNow) updateColorsOnBeat();
+
+    final multiplier = 1.6 - blur / 17.0;
+    final lowsIdx = (multiplier * ledCount * lows).round().clamp(0, ledCount);
+    final midsIdx = (multiplier * ledCount * mids).round().clamp(0, ledCount);
+    final highsIdx = (multiplier * ledCount * highs).round().clamp(0, ledCount);
+
+    // Reset pixels only if using overlap mode
+    if (mixingMode == "overlap") {
+      for (var i = 0; i < ledCount; i++) {
+        for (var c = 0; c < 3; c++) {
+          pixels[i][c] = 0.0;
+        }
+      }
+    }
+
+    // Apply additive or overlap blending
+    for (var i = 0; i < lowsIdx; i++) _blendColor(i, lowsColor);
+    for (var i = 0; i < midsIdx; i++) _blendColor(i, midsColor);
+    for (var i = 0; i < highsIdx; i++) _blendColor(i, highsColor);
+
+    // Apply blur (simple box blur)
+    if (blur > 1) {
+      final tmp = List.generate(ledCount, (_) => [0.0, 0.0, 0.0]);
+      final k = blur.round();
+      for (var i = 0; i < ledCount; i++) {
+        final start = math.max(0, i - k);
+        final end = math.min(ledCount - 1, i + k);
+        final count = end - start + 1;
+        for (var j = start; j <= end; j++) {
+          for (var c = 0; c < 3; c++) {
+            tmp[i][c] += pixels[j][c];
+          }
+        }
+        for (var c = 0; c < 3; c++) {
+          tmp[i][c] /= count;
+        }
+      }
+      pixels = tmp;
+    }
+
+    // Apply smoothing filter per pixel
+    for (var i = 0; i < ledCount; i++) {
+      for (var c = 0; c < 3; c++) {
+        final alpha = pixels[i][c] > _prevPixels[i][c]
+            ? _pFilterAlphaRise[i]
+            : _pFilterAlphaDecay[i];
+        pixels[i][c] = alpha * pixels[i][c] + (1 - alpha) * _prevPixels[i][c];
+        _prevPixels[i][c] = pixels[i][c];
+      }
+    }
+
+    // Mirror if enabled
+    final renderPixels = mirror
+        ? [...pixels, ...pixels.reversed]
+        : pixels;
+
+    // Flatten to UDP packet
+    final packet = <int>[];
+    for (var i = 0; i < renderPixels.length; i++) {
+      for (var c = 0; c < 3; c++) {
+        packet.add(renderPixels[i][c].clamp(0.0, 255.0).round());
+      }
+    }
+
+    return packet;
+  }
+
+  void _blendColor(int idx, List<double> color) {
+    if (mixingMode == "additive") {
+      for (var c = 0; c < 3; c++) pixels[idx][c] += color[c];
+    } else {
+      for (var c = 0; c < 3; c++) pixels[idx][c] = color[c];
+    }
+  }
 }

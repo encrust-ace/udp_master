@@ -9,8 +9,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_recorder/flutter_recorder.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:udp_master/effects/energy.dart';
 import 'package:udp_master/models.dart';
@@ -31,11 +31,7 @@ class VisualizerProvider with ChangeNotifier {
 
   // --- Core Services & State ---
   final UdpSender _udpSender = UdpSender();
-  final Recorder _recorder = Recorder.instance;
-  final AudioAnalyzer _audioAnalyzer = AudioAnalyzer(
-    sampleRate: 44100,
-    fftSize: 1024,
-  );
+  final AudioRecorder _recorder = AudioRecorder();
 
   bool _isRunning = false;
   bool get isRunning => _isRunning;
@@ -237,13 +233,7 @@ class VisualizerProvider with ChangeNotifier {
       }
       return false;
     }
-
-    if (Platform.isAndroid) {
-      await _startMicAndroid();
-    } else {
-      await _startMicCapture();
-    }
-
+    await _startMicCapture();
     _isRunning = true;
     notifyListeners();
     return true;
@@ -256,75 +246,58 @@ class VisualizerProvider with ChangeNotifier {
       _micSubscription = null;
       await _platform.invokeMethod("stopMic");
     } else {
-      _recorder.stopStreamingData();
-      _recorder.deinit();
+      _recorder.stop();
+      _recorder.cancel();
     }
     simulatorPackets = [];
     _isRunning = false;
     notifyListeners();
   }
 
-  Future<void> _startMicAndroid() async {
-    await _platform.invokeMethod("startMic");
-    _micSubscription = _micStreamChannel.receiveBroadcastStream().listen(
-      (samples) {
-        if (!_isRunning || _devices.isEmpty) return;
-        final floatSamples = Float32List.fromList(
-          (samples as List).map((s) => (s as num).toDouble()).toList(),
-        );
-        _processAudioData(_audioAnalyzer.analyze(floatSamples));
-      },
-      onError: (e) {
-        if (kDebugMode) print("Mic stream error: $e");
-        _stopVisualizer();
-      },
-      onDone: () {
-        if (kDebugMode) print("Mic stream done.");
-        if (_isRunning) _stopVisualizer();
-      },
-    );
-  }
-
   Future<void> _startMicCapture() async {
-
     try {
- await _recorder.init(
-        format: PCMFormat.f32le,
-        sampleRate: 44100,
-        channels: RecorderChannels.mono,
+      final analysis = AudioAnalysis(
+        config: AudioConfig(
+          micRate: 44100,
+          sampleRate: 60,
+          fftSize: 1024,
+          minVolume: 0.2,
+          delayMs: 0,
+          preEmphasisProfile: PreEmphasisProfile.generic,
+        ),
       );
-      _recorder.start();
-      _recorder.startStreamingData();
-      _micSubscription = _recorder.uint8ListStream.listen((_) {
-        if (!_isRunning || _devices.isEmpty) return;
-        _processAudioData(_audioAnalyzer.analyze(_recorder.getFft()));
-       });
+      final stream = await _recorder.startStream(
+        const RecordConfig(encoder: AudioEncoder.pcm16bits),
+      );
+      stream.listen((Uint8List chunk) {
+        analysis.processPcmFrame(chunk, format: PcmFormat.int16LE);
+        _processAudioData(analysis);
+      });
     } catch (e) {
       if (kDebugMode) print("Linux mic error: $e");
     }
   }
 
-    void _processAudioData(AudioFeatures features) {
+  void _processAudioData(AudioAnalysis analysis) {
     // Filter out only active devices once to avoid re-filtering in the loop
     final activeDevices = _devices.where((d) => d.isEffectEnabled).toList();
     final effect = _effects[_globalEffectId]!;
     for (final device in activeDevices) {
-      List<int> packetData = _getPakcetData(device, effect, features);
+      List<int> packetData = _getPakcetData(device, effect, analysis);
       if (packetData.isNotEmpty) {
         _udpSender.send(device, packetData);
       }
     }
 
     if (_currentSelectedTab == 2) {
-      _updateSimulatorData(features, effect);
+      _updateSimulatorData(analysis, effect);
     }
   }
-
 
   List<int> _getPakcetData(
     LedDevice device,
     LedEffect effect,
-    AudioFeatures features,
+    AudioAnalysis analysis,
   ) {
     List<int> packetData = [0x02, 0x04];
 
@@ -333,13 +306,17 @@ class VisualizerProvider with ChangeNotifier {
       final int segmentLedCount = (segment.endIndex - segment.startIndex) + 1;
 
       switch (effect.id) {
-        case 'energy-bars':
-          segmentPacketData = renderEnergyEffect(
+        case 'energy':
+          final effect = EnergyAudioEffect(
             ledCount: segmentLedCount,
-            features: features,
-            gain: effect.parameters["gain"]!['value'],
-            brightness: effect.parameters["brightness"]!['value'],
-            saturation: effect.parameters["saturation"]!['value'],
+            colorHigh: [255, 0, 0],
+            blur: 5,
+          );
+          segmentPacketData = effect.frame(
+            beatNow: analysis.volumeBeatNow,
+            lows: analysis.lowsPower(),
+            mids: analysis.midsPower(),
+            highs: analysis.highPower(),
           );
       }
       if (segmentPacketData.isNotEmpty) {
@@ -349,7 +326,7 @@ class VisualizerProvider with ChangeNotifier {
     return packetData;
   }
 
-  void _updateSimulatorData(AudioFeatures features, LedEffect effect) {
+  void _updateSimulatorData(AudioAnalysis analysis, LedEffect effect) {
     // This is a simplified version of the main processing loop for a single device
     LedDevice simulatedDevice = LedDevice(
       id: 'Simulator',
@@ -362,7 +339,9 @@ class VisualizerProvider with ChangeNotifier {
       segments: [Segment(id: 'segment_1', startIndex: 0, endIndex: 89)],
     );
 
-    List<int> packetData = _getPakcetData(simulatedDevice, effect, features);
+    List<int> packetData = _getPakcetData(simulatedDevice, effect, analysis);
+
+    // print(packetData);
 
     if (packetData.isNotEmpty) {
       simulatorPackets = packetData;
