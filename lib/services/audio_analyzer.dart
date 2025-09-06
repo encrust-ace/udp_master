@@ -50,10 +50,6 @@ class AudioAnalysis {
   // Hop size mirrors Python: MIC_RATE // sample_rate
   late final int hopSize = (config.micRate / config.sampleRate).round();
 
-  // Buffers
-  final Float64List _raw = Float64List(0);
-  final Float64List _latestFrame = Float64List(0);
-
   // Pre-emphasis biquad (matches the three profiles used in Python) :contentReference[oaicite:1]{index=1}
   late final _Biquad _pre = _Biquad.fromProfile(config.preEmphasisProfile);
 
@@ -335,8 +331,7 @@ class _Biquad {
       case PreEmphasisProfile.scottMel:
         return _Biquad(1.3662, -1.9256, 0.5621, -1.9256, 0.9283);
       case PreEmphasisProfile.generic:
-      default:
-        return _Biquad(0.85870, -1.71740, 0.85870, -1.71605, 0.71874);
+      return _Biquad(0.85870, -1.71740, 0.85870, -1.71605, 0.71874);
     }
   }
 
@@ -723,7 +718,6 @@ class _BeatDetector {
   final double minAmplitude;
   double _prevBeatTs = -1;
   final List<double> _hist = [];
-  final int _cursor = 0;
 
   _BeatDetector({
     required double historySeconds,

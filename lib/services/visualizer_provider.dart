@@ -19,7 +19,6 @@ import 'package:udp_master/services/udp_sender.dart';
 
 // Method and Event channels for platform-specific communication
 const MethodChannel _platform = MethodChannel("mic_channel");
-const EventChannel _micStreamChannel = EventChannel('mic_stream');
 
 class VisualizerProvider with ChangeNotifier {
   // Singleton instance

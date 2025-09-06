@@ -42,10 +42,10 @@ class EnergyAudioEffect {
       [0, 255, 255],
       [255, 0, 255],
     ],
-  })  : lowsColor = colorLows?.map((c) => c.toDouble()).toList() ?? [255, 0, 0],
-        midsColor = colorMids?.map((c) => c.toDouble()).toList() ?? [0, 255, 0],
-        highsColor = colorHigh?.map((c) => c.toDouble()).toList() ?? [0, 0, 255],
-        _decaySensitivity = (sensitivity - 0.1) * 0.7 {
+  }) : lowsColor = colorLows?.map((c) => c.toDouble()).toList() ?? [255, 0, 0],
+       midsColor = colorMids?.map((c) => c.toDouble()).toList() ?? [0, 255, 0],
+       highsColor = colorHigh?.map((c) => c.toDouble()).toList() ?? [0, 0, 255],
+       _decaySensitivity = (sensitivity - 0.1) * 0.7 {
     pixels = List.generate(ledCount, (_) => [0.0, 0.0, 0.0]);
     _prevPixels = List.generate(ledCount, (_) => [0.0, 0.0, 0.0]);
   }
@@ -95,9 +95,15 @@ class EnergyAudioEffect {
     }
 
     // Apply colors per band with additive or overlap blending
-    for (var i = 0; i < lowsIdx; i++) _blendColor(i, lowsColor);
-    for (var i = 0; i < midsIdx; i++) _blendColor(i, midsColor);
-    for (var i = 0; i < highsIdx; i++) _blendColor(i, highsColor);
+    for (var i = 0; i < lowsIdx; i++) {
+      _blendColor(i, lowsColor);
+    }
+    for (var i = 0; i < midsIdx; i++) {
+      _blendColor(i, midsColor);
+    }
+    for (var i = 0; i < highsIdx; i++) {
+      _blendColor(i, highsColor);
+    }
 
     // Apply blur (simple box blur) if blur > 1
     if (blur > 1) {
@@ -122,7 +128,9 @@ class EnergyAudioEffect {
     // Apply smoothing filter per pixel channel (like ExpFilter in Python)
     for (var i = 0; i < ledCount; i++) {
       for (var c = 0; c < 3; c++) {
-        final alpha = pixels[i][c] > _prevPixels[i][c] ? sensitivity : _decaySensitivity;
+        final alpha = pixels[i][c] > _prevPixels[i][c]
+            ? sensitivity
+            : _decaySensitivity;
         pixels[i][c] = alpha * pixels[i][c] + (1 - alpha) * _prevPixels[i][c];
         _prevPixels[i][c] = pixels[i][c];
       }
