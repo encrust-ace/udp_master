@@ -260,8 +260,7 @@ class VisualizerProvider with ChangeNotifier {
           micRate: 44100,
           sampleRate: 60,
           fftSize: 1024,
-          minVolume: 0.2,
-          delayMs: 0,
+          minVolume: 50,
           preEmphasisProfile: PreEmphasisProfile.generic,
         ),
       );

@@ -10,7 +10,6 @@ class AudioConfig {
   final int sampleRate;     // analysis fps (frames per second), e.g. 60
   final int fftSize;        // e.g. 1024
   final double minVolume;   // silence threshold mapped like LedFx [0..1]
-  final int delayMs;        // optional output sync delay like LedFx
   final PreEmphasisProfile preEmphasisProfile;
 
   // Melbank settings (rough parity with LedFx Melbanks)
@@ -28,7 +27,6 @@ class AudioConfig {
     this.sampleRate = 60,
     this.fftSize = 1024,
     this.minVolume = 0.2,
-    this.delayMs = 0,
     this.preEmphasisProfile = PreEmphasisProfile.generic,
     this.melBands = 64,
     this.maxFrequencies = const [400, 4000, 12000],
