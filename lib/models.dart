@@ -127,39 +127,3 @@ class LedDevice {
   @override
   int get hashCode => id.hashCode;
 }
-
-class LedEffect {
-  final String id;
-  final String name;
-  final Map<String, Map<String, dynamic>> parameters;
-
-  LedEffect({required this.id, required this.name, required this.parameters});
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'parameters': parameters,
-  };
-
-  factory LedEffect.fromJson(Map<String, dynamic> json) {
-    return LedEffect(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      parameters: (json['parameters'] as Map<String, dynamic>).map(
-        (k, v) => MapEntry(k, Map<String, dynamic>.from(v as Map)),
-      ),
-    );
-  }
-
-  LedEffect copyWith({
-    String? id,
-    String? name,
-    Map<String, Map<String, dynamic>>? parameters,
-  }) {
-    return LedEffect(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      parameters: parameters ?? this.parameters,
-    );
-  }
-}

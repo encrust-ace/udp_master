@@ -12,7 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:udp_master/effects/energy.dart';
+import 'package:udp_master/effects/effects.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/services/audio_analyzer.dart';
 import 'package:udp_master/services/udp_sender.dart';
@@ -46,7 +46,7 @@ class VisualizerProvider with ChangeNotifier {
   UnmodifiableListView<LedDevice> get devices => UnmodifiableListView(_devices);
 
   // --- Effect Management ---
-  String _globalEffectId = 'energy';
+  String _globalEffectId = 'vu-meter';
   String get globalEffectId => _globalEffectId;
 
   // Using a map for faster effect lookup by ID
@@ -55,36 +55,175 @@ class VisualizerProvider with ChangeNotifier {
       id: 'energy',
       name: 'Energy',
       parameters: {
-        'gain': {
-          'type': 'number',
-          'min': 0.5,
-          'max': 5.0,
-          'value': 1.0,
-          'steps': 20,
-          'default': 1.0,
-        },
-        'brightness': {
-          'type': 'number',
-          'min': 0.0,
-          'max': 1.0,
-          'value': 1.0,
-          'steps': 10,
-          'default': 1.0,
-        },
-        'saturation': {
-          'type': 'number',
-          'min': 0.0,
-          'max': 1.0,
-          'value': 1.0,
-          'steps': 10,
-          'default': 1.0,
-        },
-        'position': {
-          'type': 'option',
-          'default': 'bottom',
-          'value': 'bottom',
-          'options': ['bottom', 'mid', 'edge'],
-        },
+        'gain': EffectParameter(
+          name: 'Gain',
+          type: EffectParameterType.number,
+          value: 1.0,
+          defaultValue: 1.0,
+          min: 0.0,
+          max: 5.0,
+          steps: 10,
+        ),
+        'brightness': EffectParameter(
+          name: 'Brightness',
+          type: EffectParameterType.number,
+          value: 1.0,
+          defaultValue: 1.0,
+          min: 0.0,
+          max: 1.0,
+          steps: 10,
+        ),
+        'sensitivity': EffectParameter(
+          name: 'Sensitivity',
+          type: EffectParameterType.number,
+          value: 1.0,
+          defaultValue: 1.0,
+          min: 0.0,
+          max: 1.0,
+          steps: 10,
+        ),
+        'blur': EffectParameter(
+          name: 'Blur',
+          type: EffectParameterType.number,
+          value: 1.0,
+          defaultValue: 1.0,
+          min: 0.0,
+          max: 1.0,
+          steps: 10,
+        ),
+        'show_peak': EffectParameter(
+          name: 'Show peak',
+          type: EffectParameterType.boolean,
+          value: true,
+          defaultValue: true,
+        ),
+        'mirror': EffectParameter(
+          name: 'Mirror',
+          type: EffectParameterType.boolean,
+          value: false,
+          defaultValue: false,
+        ),
+        'peak_hold': EffectParameter(
+          name: 'Peak hold',
+          type: EffectParameterType.number,
+          value: 0.0,
+          defaultValue: 0.0,
+          min: 0.0,
+          max: 1.0,
+          steps: 10,
+        ),
+        'low_color': EffectParameter(
+          name: 'low_color',
+          type: EffectParameterType.color,
+          value: '#FF00FF00',
+          defaultValue: '',
+        ),
+        'mid_color': EffectParameter(
+          name: 'mid_color',
+          type: EffectParameterType.color,
+          value: '#FFFFFF00',
+          defaultValue: '',
+        ),
+        'high_color': EffectParameter(
+          name: 'high_color',
+          type: EffectParameterType.color,
+          value: '#FFFF0000',
+          defaultValue: '',
+        ),
+        'peak_color': EffectParameter(
+          name: 'peak_color',
+          type: EffectParameterType.color,
+          value: '#FFFFFFFF',
+          defaultValue: '',
+        ),
+      },
+    ),
+    'vu-meter': LedEffect(
+      id: 'vu-meter',
+      name: 'VU meter',
+      parameters: {
+        'gain': EffectParameter(
+          name: 'Gain',
+          type: EffectParameterType.number,
+          value: 1.0,
+          defaultValue: 1.0,
+          min: 0.0,
+          max: 5.0,
+          steps: 10,
+        ),
+        'brightness': EffectParameter(
+          name: 'Brightness',
+          type: EffectParameterType.number,
+          value: 1.0,
+          defaultValue: 1.0,
+          min: 0.0,
+          max: 1.0,
+          steps: 10,
+        ),
+        'sensitivity': EffectParameter(
+          name: 'Sensitivity',
+          type: EffectParameterType.number,
+          value: 1.0,
+          defaultValue: 1.0,
+          min: 0.0,
+          max: 1.0,
+          steps: 10,
+        ),
+        'blur': EffectParameter(
+          name: 'Blur',
+          type: EffectParameterType.number,
+          value: 1.0,
+          defaultValue: 1.0,
+          min: 0.0,
+          max: 1.0,
+          steps: 10,
+        ),
+        'show_peak': EffectParameter(
+          name: 'Show peak',
+          type: EffectParameterType.boolean,
+          value: true,
+          defaultValue: true,
+        ),
+        'mirror': EffectParameter(
+          name: 'Mirror',
+          type: EffectParameterType.boolean,
+          value: false,
+          defaultValue: false,
+        ),
+        'peak_hold': EffectParameter(
+          name: 'Peak hold',
+          type: EffectParameterType.number,
+          value: 0.0,
+          defaultValue: 0.0,
+          min: 0.0,
+          max: 1.0,
+          steps: 10,
+        ),
+        'low_color': EffectParameter(
+          name: 'low_color',
+          type: EffectParameterType.color,
+          value: '#FF00FF00',
+          defaultValue: '',
+        ),
+        'mid_color': EffectParameter(
+          name: 'mid_color',
+          type: EffectParameterType.color,
+          value: '#FFFFFF00',
+          defaultValue: '',
+        ),
+        'high_color': EffectParameter(
+          name: 'high_color',
+          type: EffectParameterType.color,
+          value: '#FFFF0000',
+          defaultValue: '',
+        ),
+        'peak_color': EffectParameter(
+          name: 'peak_color',
+          type: EffectParameterType.color,
+          value: '#FFFFFFFF',
+          defaultValue: '',
+        ),
+
       },
     ),
   };
@@ -190,10 +329,48 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   // --- Effect Actions ---
+
+  Future<void> _restoreEffects(SharedPreferences prefs) async {
+    final effectList = prefs.getStringList('effects') ?? [];
+    for (var effectJson in effectList) {
+      try {
+        final savedEffect = LedEffect.fromJson(json.decode(effectJson));
+
+        if (_effects.containsKey(savedEffect.id)) {
+          final currentEffect = _effects[savedEffect.id]!;
+
+          // Merge parameters: keep saved values, but use current definitions
+          final mergedParameters = <String, EffectParameter>{};
+          currentEffect.parameters.forEach((key, currentParam) {
+            if (savedEffect.parameters.containsKey(key)) {
+              final savedParam = savedEffect.parameters[key]!;
+              // Replace only the value, keep definition from current
+              mergedParameters[key] = currentParam.copyWith(
+                value: savedParam.value,
+              );
+            } else {
+              mergedParameters[key] = currentParam;
+            }
+          });
+
+          // Update the effect in _effects
+          _effects[savedEffect.id] = currentEffect.copyWith(
+            parameters: mergedParameters,
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print("Error decoding or merging effect: $e");
+        }
+      }
+    }
+  }
+
+  /// --- Effect Actions ---
   Future<bool> updateEffect(
     LedEffect effect,
     String key,
-    Map<String, dynamic> parameter,
+    EffectParameter parameter,
   ) async {
     final updatedEffect = effect.copyWith(
       parameters: {...effect.parameters, key: parameter},
@@ -205,14 +382,8 @@ class VisualizerProvider with ChangeNotifier {
   }
 
   Future<bool> resetEffect(LedEffect effect) async {
-    final defaultEffect = _effects[effect.id]!.copyWith(
-      parameters: Map.fromEntries(
-        effect.parameters.entries.map(
-          (e) => MapEntry(e.key, {...e.value, 'value': e.value['default']}),
-        ),
-      ),
-    );
-    _effects[effect.id] = defaultEffect;
+    final resetEffect = effect.resetToDefaults();
+    _effects[effect.id] = resetEffect;
     await _saveEffects();
     notifyListeners();
     return true;
@@ -255,66 +426,60 @@ class VisualizerProvider with ChangeNotifier {
 
   Future<void> _startMicCapture() async {
     try {
-      final analysis = AudioAnalysis(
-        config: AudioConfig(
-          micRate: 44100,
-          sampleRate: 60,
-          fftSize: 1024,
-          minVolume: 50,
-          preEmphasisProfile: PreEmphasisProfile.generic,
-        ),
+      const config = AudioConfig(
+        micRate: 44100,
+        analysisRate: 60,
+        fftSize: 1024,
+        minVolume: 50,
+        melBands: 64,
       );
+      final visualizer = AudioVisualizer(config);
+
       final stream = await _recorder.startStream(
         const RecordConfig(encoder: AudioEncoder.pcm16bits),
       );
       stream.listen((Uint8List chunk) {
-        analysis.processPcmFrame(chunk, format: PcmFormat.int16LE);
-        _processAudioData(analysis);
+        final audioFeatures = visualizer.processAudio(chunk, isFloat32: false);
+        _processAudioData(audioFeatures);
       });
     } catch (e) {
       if (kDebugMode) print("Linux mic error: $e");
     }
   }
 
-  void _processAudioData(AudioAnalysis analysis) {
+  void _processAudioData(AudioFeatures audioFeatures) {
     // Filter out only active devices once to avoid re-filtering in the loop
     final activeDevices = _devices.where((d) => d.isEffectEnabled).toList();
     final effect = _effects[_globalEffectId]!;
     for (final device in activeDevices) {
-      List<int> packetData = _getPakcetData(device, effect, analysis);
+      List<int> packetData = _getPakcetData(device, effect, audioFeatures);
       if (packetData.isNotEmpty) {
         _udpSender.send(device, packetData);
       }
     }
 
     if (_currentSelectedTab == 2) {
-      _updateSimulatorData(analysis, effect);
+      _updateSimulatorData(audioFeatures, effect);
     }
   }
 
   List<int> _getPakcetData(
     LedDevice device,
     LedEffect effect,
-    AudioAnalysis analysis,
+    AudioFeatures audioFeatures,
   ) {
     List<int> packetData = [0x02, 0x04];
 
     for (Segment segment in device.segments) {
       List<int> segmentPacketData = [];
       final int segmentLedCount = (segment.endIndex - segment.startIndex) + 1;
-
       switch (effect.id) {
-        case 'energy':
-          final effect = EnergyAudioEffect(
-            ledCount: segmentLedCount,
-            colorHigh: [255, 0, 0],
-            blur: 5,
-          );
-          segmentPacketData = effect.frame(
-            beatNow: analysis.volumeBeatNow,
-            lows: analysis.lowsPower(),
-            mids: analysis.midsPower(),
-            highs: analysis.highPower(),
+        case 'vu-meter':
+          final effectRenderer = VUMeterRenderer();
+          segmentPacketData = effectRenderer.render(
+            effect,
+            audioFeatures,
+            segmentLedCount,
           );
       }
       if (segmentPacketData.isNotEmpty) {
@@ -324,7 +489,7 @@ class VisualizerProvider with ChangeNotifier {
     return packetData;
   }
 
-  void _updateSimulatorData(AudioAnalysis analysis, LedEffect effect) {
+  void _updateSimulatorData(AudioFeatures audioFeatures, LedEffect effect) {
     // This is a simplified version of the main processing loop for a single device
     LedDevice simulatedDevice = LedDevice(
       id: 'Simulator',
@@ -337,7 +502,11 @@ class VisualizerProvider with ChangeNotifier {
       segments: [Segment(id: 'segment_1', startIndex: 0, endIndex: 89)],
     );
 
-    List<int> packetData = _getPakcetData(simulatedDevice, effect, analysis);
+    List<int> packetData = _getPakcetData(
+      simulatedDevice,
+      effect,
+      audioFeatures,
+    );
 
     // print(packetData);
 
@@ -369,43 +538,6 @@ class VisualizerProvider with ChangeNotifier {
     _devices = deviceList
         .map((e) => LedDevice.fromJson(json.decode(e)))
         .toList();
-  }
-
-  Future<void> _restoreEffects(SharedPreferences prefs) async {
-    final effectList = prefs.getStringList('effects') ?? [];
-    for (var effectJson in effectList) {
-      try {
-        final savedEffect = LedEffect.fromJson(json.decode(effectJson));
-        if (_effects.containsKey(savedEffect.id)) {
-          // Get the current effect from _effects
-          final currentEffect = _effects[savedEffect.id]!;
-
-          // Merge parameters: keep saved values, but use current parameter definitions
-          final mergedParameters = <String, Map<String, dynamic>>{};
-          currentEffect.parameters.forEach((key, currentParam) {
-            if (savedEffect.parameters.containsKey(key)) {
-              // Use the saved value, but keep the current min/max/steps/default
-              mergedParameters[key] = {
-                ...currentParam,
-                'value': savedEffect.parameters[key]!['value'],
-              };
-            } else {
-              // If the parameter doesn't exist in the saved effect, use the current one
-              mergedParameters[key] = currentParam;
-            }
-          });
-
-          // Update the effect in _effects with merged parameters and current name/id
-          _effects[savedEffect.id] = currentEffect.copyWith(
-            parameters: mergedParameters,
-          );
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print("Error decoding or merging effect: $e");
-        }
-      }
-    }
   }
 
   Future<bool> _ensureMicPermission() async {

@@ -3,12 +3,13 @@ import 'package:provider/provider.dart';
 import 'package:udp_master/models.dart';
 import 'package:udp_master/services/visualizer_provider.dart';
 
+import '../effects/effects.dart';
+
 class EffectsPage extends StatelessWidget {
   const EffectsPage({super.key});
 
   void resetEffect(BuildContext context, LedEffect effect) {
-    final provider = context.read<VisualizerProvider>();
-    provider.resetEffect(effect);
+    context.read<VisualizerProvider>().resetEffect(effect);
   }
 
   @override
@@ -24,29 +25,28 @@ class EffectsPage extends StatelessWidget {
 
         return Card(
           elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
           margin: const EdgeInsets.symmetric(vertical: 8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: 18.0,
-              horizontal: 18.0,
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header row with name and reset button
+                // --- Header row ---
                 Row(
                   children: [
-                    Icon(
-                      Icons.animation,
-                      size: 28,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    Icon(Icons.animation,
+                        size: 28,
+                        color: Theme.of(context).colorScheme.primary),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         effect.name,
-                        style: Theme.of(context).textTheme.titleMedium
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -59,96 +59,88 @@ class EffectsPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // Sliders for each parameter
+                // --- Parameters ---
                 ...effect.parameters.entries.map((entry) {
                   final key = entry.key;
                   final param = entry.value;
-                  final String dataType = param["type"] ?? "number";
 
-                  if (dataType == "number") {
-                    final double min = (param["min"] ?? 0.0).toDouble();
-                    final double max = (param["max"] ?? 1.0).toDouble();
-                    final double currentValue = (param["value"] ?? 0.0)
-                        .toDouble();
-                    final double defaultValue = (param["default"] ?? 0.0)
-                        .toDouble();
-                    final int steps = (param["steps"] ?? 20).toInt();
+                  switch (param.type) {
+                    case EffectParameterType.number:
+                      final double min = param.min ?? 0.0;
+                      final double max = param.max ?? 1.0;
+                      final double currentValue = param.value ?? 0.0;
+                      final int steps = param.steps ?? 20;
 
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Row(
-                        children: [
-                          SizedBox(width: 100, child: Text(key)),
-                          Text(currentValue.toStringAsFixed(2)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Slider(
-                              value: currentValue,
-                              min: min,
-                              max: max,
-                              divisions: steps,
-                              onChanged: (val) {
-                                context
-                                    .read<VisualizerProvider>()
-                                    .updateEffect(effect, key, {
-                                      "type": dataType,
-                                      "min": min,
-                                      "max": max,
-                                      "value": val,
-                                      "steps": steps,
-                                      "default": defaultValue,
-                                    });
-                              },
-                            ),
-                          ),
-                          Text(max.toStringAsFixed(1)),
-                        ],
-                      ),
-                    );
-                  } else if (dataType == "option") {
-                     final String defaultValue = (param["default"] ?? "");
-
-                    final List<String> options = List<String>.from(
-                      param["options"] ?? [],
-                    );
-                    final String currentOption =
-                        param["value"] ?? options.first;
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Row(
-                        children: [
-                          SizedBox(width: 100, child: Text(key)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: DropdownButton<String>(
-                              value: currentOption,
-                              isExpanded: true,
-                              items: options.map((option) {
-                                return DropdownMenuItem<String>(
-                                  value: option,
-                                  child: Text(option),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                if (val != null) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            SizedBox(width: 100, child: Text(param.name)),
+                            Text(currentValue.toStringAsFixed(2)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Slider(
+                                value: currentValue,
+                                min: min,
+                                max: max,
+                                divisions: steps,
+                                onChanged: (val) {
                                   context
                                       .read<VisualizerProvider>()
-                                      .updateEffect(effect, key, {
-                                        "type": dataType,
-                                        "default": defaultValue,
-                                        "value": val,
-                                        "options": options,
-                                      });
-                                }
-                              },
+                                      .updateEffect(
+                                    effect,
+                                    key,
+                                    param.copyWith(value: val),
+                                  );
+                                },
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  } else {
-                    return const SizedBox.shrink();
+                            Text(max.toStringAsFixed(1)),
+                          ],
+                        ),
+                      );
+
+                    case EffectParameterType.option:
+                      final List<String> options =
+                      List<String>.from(param.options ?? []);
+                      final String currentOption =
+                          param.value ?? options.first;
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            SizedBox(width: 100, child: Text(param.name)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: DropdownButton<String>(
+                                value: currentOption,
+                                isExpanded: true,
+                                items: options.map((option) {
+                                  return DropdownMenuItem<String>(
+                                    value: option,
+                                    child: Text(option),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    context
+                                        .read<VisualizerProvider>()
+                                        .updateEffect(
+                                      effect,
+                                      key,
+                                      param.copyWith(value: val),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+
+                    default:
+                      return const SizedBox.shrink();
                   }
                 }),
               ],
